@@ -67,6 +67,18 @@ HTML;
         $this->assertSame(['/about/', '/solar/contact/', '/shop/'], $this->parsed()['links']);
     }
 
+    public function test_it_reads_the_language_and_declared_icons(): void
+    {
+        $html = '<html lang="en-GB"><head><link rel="shortcut icon" href="/favicon.ico"><link rel="icon" href="/a.png">'
+            . '<link rel="apple-touch-icon" href="/apple.png"><link rel="stylesheet" href="/x.css"></head><body>x</body></html>';
+
+        $page = PageParser::parse($html, '/', 'example.com');
+
+        $this->assertSame('en-GB', $page['lang']);
+        $this->assertSame(['/favicon.ico', '/a.png'], $page['icons']['icon']);
+        $this->assertSame(['/apple.png'], $page['icons']['apple']);
+    }
+
     public function test_cloudflare_proxy_links_are_not_internal_pages(): void
     {
         $html = '<html><body><a href="/cdn-cgi/l/email-protection#abc">mail</a><a href="/about/">About</a></body></html>';

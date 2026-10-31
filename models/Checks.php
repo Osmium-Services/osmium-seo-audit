@@ -42,6 +42,12 @@ class Checks
         'viewport_missing' => ['label' => 'Missing viewport tag', 'severity' => 'medium', 'group' => 'Technical', 'fix' => 'Without a viewport tag the page is not mobile friendly (theme head).'],
         'slow_response' => ['label' => 'Slow response', 'severity' => 'medium', 'group' => 'Technical', 'fix' => 'The server took too long to answer. Check hosting, caching and heavy queries.'],
         'heavy_page' => ['label' => 'Heavy page', 'severity' => 'low', 'group' => 'Technical', 'fix' => 'The page HTML is very large. Trim inline scripts and repeated markup.'],
+        'favicon_missing' => ['label' => 'Favicon missing', 'severity' => 'medium', 'group' => 'Site-wide', 'fix' => 'The site has no working favicon, so browser tabs, bookmarks and search results show a blank icon. Add one (Company > Site Icons, or the theme head).'],
+        'apple_icon_missing' => ['label' => 'Home screen icon missing', 'severity' => 'low', 'group' => 'Site-wide', 'fix' => 'No working apple-touch-icon, so phones show a blank tile when the site is saved to the home screen.'],
+        'robots_missing' => ['label' => 'robots.txt missing', 'severity' => 'medium', 'group' => 'Site-wide', 'fix' => 'The live site has no robots.txt. Search engines look for it first, and it points them at the sitemap.'],
+        'sitemap_missing' => ['label' => 'Sitemap missing or empty', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'The live site has no usable sitemap.xml, so search engines find pages only by following links.'],
+        'soft_404' => ['label' => 'Missing pages do not return 404', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'A made-up address did not return a 404 status. Search engines may index empty or duplicate pages. Return a real 404 for unknown pages.'],
+        'lang_missing' => ['label' => 'No page language', 'severity' => 'low', 'group' => 'Technical', 'fix' => 'The html tag has no lang attribute (for example lang="en-GB"), which helps search engines and screen readers (theme).'],
         'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content but tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
     ];
 
@@ -87,6 +93,7 @@ class Checks
             self::orphans($pages),
             self::redirectChains($pages, $byKey),
             self::siteWide($context),
+            self::siteChecks($context['site'] ?? null, (bool) ($context['isLive'] ?? false)),
         );
 
         return \array_values($findings);
@@ -273,6 +280,9 @@ class Checks
         $hasViewport = !empty($page['has_viewport']);
         if (!$hasViewport) $findings[] = self::finding('viewport_missing', $url);
 
+        $hasLang = trim((string) ($page['lang'] ?? '')) !== '';
+        if (!$hasLang) $findings[] = self::finding('lang_missing', $url);
+
         $ms = (int) ($page['response_ms'] ?? 0);
         if ($ms > $thresholds['slowMs']) $findings[] = self::finding('slow_response', $url, "{$ms} ms");
 
@@ -318,9 +328,42 @@ class Checks
 
         $findings = [];
         foreach ($pages as $page) {
-            $isOrphan = !empty($page['in_sitemap']) && self::key($page['url']) !== '/' && !isset($linkedTo[self::key($page['url'])]);
+            $isPage = (int) ($page['status_code'] ?? 0) === 200;
+            $isOrphan = $isPage && !empty($page['in_sitemap']) && self::key($page['url']) !== '/' && !isset($linkedTo[self::key($page['url'])]);
             if ($isOrphan) $findings[] = self::finding('orphan_page', $page['url']);
         }
+
+        return $findings;
+    }
+
+    /**
+     * Whole-site checks from the probes the runner made.
+     *
+     * @param array{robots?: int, sitemap?: array{status: int, urls: int}, favicon?: array{declared: bool, status: ?int}, apple?: array{declared: bool, status: ?int}, notFound?: int}|null $site
+     */
+    private static function siteChecks(?array $site, bool $isLive): array
+    {
+        if ($site === null) return [];
+
+        $findings = [];
+        $favicon = $site['favicon'] ?? null;
+        $faviconBroken = $favicon !== null && $favicon['status'] !== null && $favicon['status'] !== 200;
+        if ($faviconBroken) $findings[] = self::finding('favicon_missing', null, $favicon['declared'] ? "Declared icon returned {$favicon['status']}" : "None declared and /favicon.ico returned {$favicon['status']}");
+
+        $apple = $site['apple'] ?? null;
+        $appleBroken = $apple !== null && $apple['status'] !== null && $apple['status'] !== 200;
+        if ($appleBroken) $findings[] = self::finding('apple_icon_missing', null, $apple['declared'] ? "Declared icon returned {$apple['status']}" : 'None declared');
+
+        $robotsBroken = $isLive && isset($site['robots']) && $site['robots'] !== 200;
+        if ($robotsBroken) $findings[] = self::finding('robots_missing', null, 'Status ' . $site['robots']);
+
+        $sitemap = $site['sitemap'] ?? null;
+        $sitemapBroken = $isLive && $sitemap !== null && ($sitemap['status'] !== 200 || $sitemap['urls'] === 0);
+        if ($sitemapBroken) $findings[] = self::finding('sitemap_missing', null, $sitemap['status'] !== 200 ? 'Status ' . $sitemap['status'] : 'No page addresses in it');
+
+        $notFound = $site['notFound'] ?? 0;
+        $isSoft404 = $notFound === 200 || ($notFound >= 300 && $notFound < 400);
+        if ($isSoft404) $findings[] = self::finding('soft_404', null, "An unknown address returned {$notFound}");
 
         return $findings;
     }

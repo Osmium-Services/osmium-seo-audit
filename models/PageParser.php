@@ -46,6 +46,8 @@ class PageParser
             'jsonld_invalid' => $jsonLdInvalid,
             'body_hash' => $text === '' ? null : \md5(\preg_replace('/\s+/', ' ', \strtolower($text)) ?? $text),
             'links' => $links,
+            'lang' => self::attribute($xpath, '//html', 'lang'),
+            'icons' => self::icons($xpath),
         ];
     }
 
@@ -128,6 +130,21 @@ class PageParser
         }
 
         return $missing;
+    }
+
+    /** @return array{icon: string[], apple: string[]} the favicon and apple-touch-icon addresses the head declares */
+    private static function icons(\DOMXPath $xpath): array
+    {
+        $icons = ['icon' => [], 'apple' => []];
+        foreach ($xpath->query('//link[@rel][@href]') as $link) {
+            $rel = \preg_split('/\s+/', \strtolower(\trim($link->getAttribute('rel')))) ?: [];
+            $href = \trim($link->getAttribute('href'));
+            $isApple = \in_array('apple-touch-icon', $rel, true) || \in_array('apple-touch-icon-precomposed', $rel, true);
+            if ($isApple) $icons['apple'][] = $href;
+            if (!$isApple && \in_array('icon', $rel, true)) $icons['icon'][] = $href;
+        }
+
+        return $icons;
     }
 
     private static function invalidJsonLd(\DOMXPath $xpath): int

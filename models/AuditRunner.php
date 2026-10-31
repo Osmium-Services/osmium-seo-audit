@@ -54,7 +54,26 @@ class AuditRunner
             if ($this->store->addPage(runId: $runId, url: $page['path'], source: 'site', inSitemap: $page['inSitemap'])) $added++;
         }
 
+        if ($this->isLive) $this->queueSitemapPages($runId, $token);
+
         return $runId;
+    }
+
+    /** Every address the live sitemap lists is checked too, in the exact form it is listed */
+    private function queueSitemapPages(int $runId, string $token): void
+    {
+        $response = $this->crawler->fetch($this->crawlBase() . '/sitemap.xml', $token);
+        $found = $response['status'] === 200;
+        if (!$found) return;
+
+        $total = $this->store->progress($runId)['total'];
+        foreach (SitemapReader::paths($response['body'], $this->siteHost()) as $path) {
+            $full = $total >= $this->settings['pageCap'];
+            $tooLong = \strlen($path) > 255;
+            if ($full) return;
+            if ($tooLong) continue;
+            if ($this->store->addPage(runId: $runId, url: $path, source: 'sitemap', inSitemap: true)) $total++;
+        }
     }
 
     /**
@@ -149,8 +168,10 @@ class AuditRunner
             'thresholds' => $this->settings['thresholds'],
             'baseUrl' => $this->siteUrl,
             'isLive' => $this->isLive,
-            'robotsDisallow' => $this->isLive ? $this->robotsRules($token) : [],
+            'robotsDisallow' => [],
+            'site' => $this->probeSite($pages, $token),
         ];
+        $context['robotsDisallow'] = $this->isLive ? Checks::parseRobotsDisallow($this->robotsTxt) : [];
 
         $findings = Checks::run($pages, $context);
         $score = Scoring::score($findings, \count($pages));
@@ -160,12 +181,88 @@ class AuditRunner
         return $score;
     }
 
-    /** @return string[] */
-    private function robotsRules(string $token): array
-    {
-        $response = $this->crawler->fetch($this->crawlBase() . '/robots.txt', $token);
-        $found = $response['status'] === 200;
+    private string $robotsTxt = '';
 
-        return $found ? Checks::parseRobotsDisallow($response['body']) : [];
+    /**
+     * The whole-site probes: robots.txt, the sitemap, the favicon and home screen icon the home page declares, and
+     * what an address that cannot exist returns.
+     *
+     * @param array<int, array<string, mixed>> $pages
+     * @return array<string, mixed>
+     */
+    private function probeSite(array $pages, string $token): array
+    {
+        $home = $this->homePage($pages);
+        $declared = $home['icons'] ?? ['icon' => [], 'apple' => []];
+
+        $robots = $this->crawler->fetch($this->crawlBase() . '/robots.txt', $token);
+        $this->robotsTxt = $robots['status'] === 200 ? $robots['body'] : '';
+        $sitemap = $this->crawler->fetch($this->crawlBase() . '/sitemap.xml', $token);
+        $probe = $this->unknownAddressStatus($token);
+
+        return [
+            'robots' => $robots['status'],
+            'sitemap' => ['status' => $sitemap['status'], 'urls' => \count(SitemapReader::paths($sitemap['body'], $this->siteHost()))],
+            'favicon' => $this->iconProbe($declared['icon'], '/favicon.ico', $token),
+            'apple' => $this->iconProbe($declared['apple'], '/apple-touch-icon.png', $token),
+            'notFound' => $probe,
+        ];
+    }
+
+    /**
+     * What an address that cannot exist finally returns. A redirect to the site's own slash form is followed once, so a
+     * site that normalises the address first and then returns 404 is not mistaken for one that returns 200 for everything.
+     */
+    private function unknownAddressStatus(string $token): int
+    {
+        $first = $this->crawler->fetch($this->crawlBase() . '/osmium-audit-probe-' . \bin2hex(\random_bytes(4)) . '/', $token);
+        $isRedirect = $first['status'] >= 300 && $first['status'] < 400;
+        $target = $isRedirect ? $this->localPath($first['headers']['location'] ?? '') : null;
+        if ($target === null || \trim($target, '/') === '') return $first['status'];
+
+        return $this->crawler->fetch($this->crawlBase() . $target, $token)['status'];
+    }
+
+    /** @param array<int, array<string, mixed>> $pages */
+    private function homePage(array $pages): ?array
+    {
+        foreach ($pages as $page) {
+            if ($page['url'] === '/' && (int) $page['status_code'] === 200) return $page;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether an icon loads: the first declared one on this site, otherwise the conventional file. Status null means
+     * it is declared but hosted elsewhere, so it is not probed.
+     *
+     * @param string[] $declared hrefs from the home page head
+     * @return array{declared: bool, status: ?int}
+     */
+    private function iconProbe(array $declared, string $conventional, string $token): array
+    {
+        if ($declared === []) return ['declared' => false, 'status' => $this->crawler->fetch($this->crawlBase() . $conventional, $token)['status']];
+
+        $local = $this->localPath($declared[0]);
+        if ($local === null) return ['declared' => true, 'status' => null];
+
+        return ['declared' => true, 'status' => $this->crawler->fetch($this->crawlBase() . $local, $token)['status']];
+    }
+
+    /** The path (with query) of an address on this site, or null for another host */
+    private function localPath(string $href): ?string
+    {
+        $parts = \parse_url(\str_starts_with($href, '//') ? 'https:' . $href : $href);
+        if ($parts === false) return null;
+
+        $host = isset($parts['host']) ? \strtolower($parts['host']) : null;
+        $isOtherHost = $host !== null && $host !== \strtolower($this->siteHost()) && $host !== 'www.' . \strtolower($this->siteHost()) && 'www.' . $host !== \strtolower($this->siteHost());
+        if ($isOtherHost) return null;
+
+        $path = $parts['path'] ?? '/';
+        $path = $path[0] === '/' ? $path : '/' . $path;
+
+        return $path . (isset($parts['query']) ? '?' . $parts['query'] : '');
     }
 }

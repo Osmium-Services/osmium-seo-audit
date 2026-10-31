@@ -121,7 +121,8 @@ class AuditStore extends Model
             ':ogTitle' => (int) ($facts['og_title'] ?? false), ':ogImage' => (int) ($facts['og_image'] ?? false),
             ':viewport' => (int) ($facts['has_viewport'] ?? false), ':jsonld' => (int) ($facts['jsonld_invalid'] ?? 0),
             ':hash' => $facts['body_hash'] ?? null, ':ms' => $ms, ':bytes' => $bytes,
-            ':links' => \json_encode($facts['links'] ?? []), ':id' => $id,
+            ':links' => \json_encode($facts['links'] ?? []), ':lang' => $facts['lang'] ?? null,
+            ':icons' => isset($facts['icons']) ? \json_encode($facts['icons']) : null, ':id' => $id,
         ])->execute();
     }
 
@@ -131,6 +132,7 @@ class AuditStore extends Model
         $rows = $this->database->prepare(sql: $this->loadSqlFile('page-all.sql'), bindings: [':run' => $runId])->resultset();
         foreach ($rows as &$row) {
             $row['links'] = \json_decode((string) ($row['links'] ?? '[]'), associative: true) ?: [];
+            $row['icons'] = \json_decode((string) ($row['icons'] ?? ''), associative: true) ?: ['icon' => [], 'apple' => []];
         }
 
         return $rows;

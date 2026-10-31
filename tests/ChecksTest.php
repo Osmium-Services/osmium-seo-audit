@@ -22,7 +22,7 @@ class ChecksTest extends TestCase
             'url' => $url, 'in_sitemap' => 1, 'fetched' => 1, 'status_code' => 200, 'redirect_target' => null, 'fetch_error' => null,
             'title' => 'A perfectly good page title for ' . $url, 'description' => \str_repeat('A useful description. ', 5) . $url,
             'canonical' => 'https://example.com' . $url, 'robots' => 'index,follow', 'h1_count' => 1, 'heading_levels' => '1,2,3',
-            'word_count' => 400, 'images_missing_alt' => 0, 'og_title' => 1, 'og_image' => 1, 'has_viewport' => 1, 'jsonld_invalid' => 0,
+            'word_count' => 400, 'images_missing_alt' => 0, 'og_title' => 1, 'og_image' => 1, 'has_viewport' => 1, 'lang' => 'en-GB', 'jsonld_invalid' => 0,
             'body_hash' => \md5($url), 'response_ms' => 200, 'bytes' => 20000, 'links' => [],
         ];
     }
@@ -160,6 +160,71 @@ class ChecksTest extends TestCase
         ];
 
         $this->assertNotContains('title_duplicate', \array_column($this->audit($pages), 'check_key'));
+    }
+
+    private function siteKeys(array $site, bool $isLive = true): array
+    {
+        $findings = Checks::run([$this->page('/', ['links' => []])], ['site' => $site, 'isLive' => $isLive, 'baseUrl' => 'https://example.com']);
+        $keys = [];
+        foreach ($findings as $finding) {
+            if ($finding['page_url'] === null) $keys[] = $finding['check_key'];
+        }
+        \sort($keys);
+
+        return $keys;
+    }
+
+    private function healthySite(array $over = []): array
+    {
+        return $over + [
+            'robots' => 200, 'sitemap' => ['status' => 200, 'urls' => 12], 'favicon' => ['declared' => true, 'status' => 200],
+            'apple' => ['declared' => true, 'status' => 200], 'notFound' => 404,
+        ];
+    }
+
+    public function test_a_healthy_site_raises_no_site_wide_findings(): void
+    {
+        $this->assertSame([], $this->siteKeys($this->healthySite()));
+    }
+
+    public function test_site_wide_problems_are_raised(): void
+    {
+        $site = $this->healthySite(['robots' => 404, 'sitemap' => ['status' => 404, 'urls' => 0], 'favicon' => ['declared' => false, 'status' => 404], 'apple' => ['declared' => false, 'status' => 404], 'notFound' => 200]);
+
+        $this->assertSame(['apple_icon_missing', 'favicon_missing', 'robots_missing', 'sitemap_missing', 'soft_404'], $this->siteKeys($site));
+    }
+
+    public function test_an_empty_sitemap_is_missing_and_an_external_icon_is_not_probed(): void
+    {
+        $site = $this->healthySite(['sitemap' => ['status' => 200, 'urls' => 0], 'favicon' => ['declared' => true, 'status' => null]]);
+
+        $this->assertSame(['sitemap_missing'], $this->siteKeys($site));
+    }
+
+    public function test_robots_and_sitemap_are_only_expected_on_a_live_site(): void
+    {
+        $site = $this->healthySite(['robots' => 404, 'sitemap' => ['status' => 404, 'urls' => 0]]);
+
+        $this->assertSame([], $this->siteKeys($site, isLive: false));
+    }
+
+    public function test_a_redirect_for_an_unknown_address_is_a_soft_404(): void
+    {
+        $this->assertSame(['soft_404'], $this->siteKeys($this->healthySite(['notFound' => 301])));
+    }
+
+    public function test_a_page_without_a_language_is_flagged_and_a_redirected_sitemap_page_is_not_an_orphan(): void
+    {
+        $pages = [
+            $this->page('/a/', ['lang' => '']),
+            $this->page('/b/'),
+            $this->page('/moved', ['status_code' => 301, 'redirect_target' => '/b/']),
+        ];
+
+        $findings = $this->audit($pages);
+
+        $this->assertContains('lang_missing', $this->keysFor($findings, '/a/'));
+        $this->assertNotContains('orphan_page', $this->keysFor($findings, '/moved'));
     }
 
     public function test_links_to_broken_and_redirected_pages(): void
