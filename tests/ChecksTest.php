@@ -139,6 +139,29 @@ class ChecksTest extends TestCase
         $this->assertContains('h1_multiple', $this->keysFor($this->audit($pages), '/b/'));
     }
 
+    public function test_noindex_pages_skip_ranking_checks_but_real_content_is_raised(): void
+    {
+        $pages = [
+            $this->page('/a/', ['robots' => 'noindex,follow', 'in_sitemap' => 0, 'title' => '', 'description' => '', 'h1_count' => 0, 'word_count' => 120, 'og_title' => 0]),
+            $this->page('/b/', ['robots' => 'noindex,follow', 'in_sitemap' => 0, 'word_count' => 800]),
+        ];
+
+        $findings = $this->audit($pages);
+
+        $this->assertSame([], $this->keysFor($findings, '/a/'));
+        $this->assertSame(['noindex_content'], $this->keysFor($findings, '/b/'));
+    }
+
+    public function test_noindex_pages_do_not_count_as_duplicates(): void
+    {
+        $pages = [
+            $this->page('/a/', ['title' => 'Shared title for these pages', 'robots' => 'noindex,follow', 'in_sitemap' => 0]),
+            $this->page('/b/', ['title' => 'Shared title for these pages']),
+        ];
+
+        $this->assertNotContains('title_duplicate', \array_column($this->audit($pages), 'check_key'));
+    }
+
     public function test_links_to_broken_and_redirected_pages(): void
     {
         $pages = [

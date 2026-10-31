@@ -68,7 +68,7 @@ class SeoAuditController extends AdminController
         $this->data['admin']['thresholdLabels'] = [
             'titleMin' => 'Title: shortest (characters)', 'titleMax' => 'Title: longest (characters)',
             'descriptionMin' => 'Description: shortest (characters)', 'descriptionMax' => 'Description: longest (characters)',
-            'thinWords' => 'Thin page: fewer than (words)', 'slowMs' => 'Slow response: over (ms)', 'heavyBytes' => 'Heavy page: over (bytes)',
+            'thinWords' => 'Thin page: fewer than (words)', 'noindexWords' => 'Noindex page with real content: at least (words)', 'slowMs' => 'Slow response: over (ms)', 'heavyBytes' => 'Heavy page: over (bytes)',
         ];
         $this->data['admin']['siteUrl'] = (string) $this->osmium->config->site->FQDN;
 

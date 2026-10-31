@@ -42,13 +42,14 @@ class Checks
         'viewport_missing' => ['label' => 'Missing viewport tag', 'severity' => 'medium', 'group' => 'Technical', 'fix' => 'Without a viewport tag the page is not mobile friendly (theme head).'],
         'slow_response' => ['label' => 'Slow response', 'severity' => 'medium', 'group' => 'Technical', 'fix' => 'The server took too long to answer. Check hosting, caching and heavy queries.'],
         'heavy_page' => ['label' => 'Heavy page', 'severity' => 'low', 'group' => 'Technical', 'fix' => 'The page HTML is very large. Trim inline scripts and repeated markup.'],
+        'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content but tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
     ];
 
     public const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 
     public const DEFAULT_THRESHOLDS = [
         'titleMin' => 15, 'titleMax' => 60, 'descriptionMin' => 70, 'descriptionMax' => 160,
-        'thinWords' => 150, 'slowMs' => 1500, 'heavyBytes' => 1500000,
+        'thinWords' => 150, 'noindexWords' => 300, 'slowMs' => 1500, 'heavyBytes' => 1500000,
     ];
 
     /**
@@ -67,10 +68,12 @@ class Checks
         $findings = [];
         foreach ($pages as $page) {
             $hasHtml = (int) ($page['status_code'] ?? 0) === 200;
+            $isNoindex = $hasHtml && PageParser::isNoindex((string) ($page['robots'] ?? ''));
             $findings = \array_merge(
                 $findings,
                 self::indexingFindings($page, $context),
-                $hasHtml ? self::contentFindings($page, $thresholds) : [],
+                $isNoindex ? self::noindexFindings($page, $thresholds) : [],
+                ($hasHtml && !$isNoindex) ? self::contentFindings($page, $thresholds) : [],
                 $hasHtml ? self::linkFindings($page, $byKey) : [],
                 $hasHtml ? self::technicalFindings($page, $thresholds) : [],
             );
@@ -167,6 +170,15 @@ class Checks
         if (!$sameSite) return null;
 
         return $parts['path'] ?? '/';
+    }
+
+    /** A noindex page is not meant to rank, so the ranking checks are skipped: only one carrying real content is raised */
+    private static function noindexFindings(array $page, array $thresholds): array
+    {
+        $words = (int) ($page['word_count'] ?? 0);
+        if ($words < $thresholds['noindexWords']) return [];
+
+        return [self::finding('noindex_content', $page['url'], "{$words} words, but marked noindex")];
     }
 
     private static function contentFindings(array $page, array $thresholds): array
@@ -276,7 +288,8 @@ class Checks
         $groups = [];
         foreach ($pages as $page) {
             $value = \trim((string) ($page[$field] ?? ''));
-            $countable = (int) ($page['status_code'] ?? 0) === 200 && $value !== '';
+            $indexable = !PageParser::isNoindex((string) ($page['robots'] ?? ''));
+            $countable = (int) ($page['status_code'] ?? 0) === 200 && $value !== '' && $indexable;
             if ($countable) $groups[$value][] = $page['url'];
         }
 
