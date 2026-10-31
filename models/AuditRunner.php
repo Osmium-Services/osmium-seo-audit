@@ -11,6 +11,7 @@ namespace Osmium\Services\SeoAudit\Models;
 class AuditRunner
 {
     private const BATCH = 5;
+    private const IMAGE_CAP = 500; // images checked per run, on top of the page limit
 
     /**
      * @param array{pageCap: int, delayMs: int, baseUrl: string, thresholds: array<string, int>} $settings
@@ -115,21 +116,45 @@ class AuditRunner
         return ['status' => $status, 'done' => $progress['done'], 'total' => $progress['total'], 'finished' => $status !== 'running', 'score' => $score];
     }
 
-    /** @param array{id: int, url: string} $page */
+    /** @param array{id: int, url: string, source: string} $page */
     private function fetchPage(int $runId, array $page, string $token, int $pageCap): void
     {
-        $response = $this->crawler->fetch($this->crawlBase() . $page['url'], $token);
+        $isImage = $page['source'] === 'image';
+        $response = $isImage ? $this->headImage($page['url'], $token) : $this->crawler->fetch($this->crawlBase() . $page['url'], $token);
         $status = $response['status'];
         $contentType = \strtolower($response['headers']['content-type'] ?? '');
         $isHtml = $status === 200 && \str_contains($contentType, 'html');
 
         $facts = $isHtml ? PageParser::parse($response['body'], $page['url'], $this->siteHost(), $response['headers']['x-robots-tag'] ?? '') : [];
         if ($isHtml) $this->queueLinks($runId, $facts['links'], $pageCap);
+        if ($isHtml) $this->queueImages($runId, $facts['images']);
 
         $this->store->savePage(
             id: (int) $page['id'], status: $status, redirect: $this->redirectTarget($response['headers']['location'] ?? null),
             error: $response['error'], facts: $facts, ms: $response['ms'], bytes: $response['bytes'],
         );
+    }
+
+    /** The status of an image without downloading it. A server that refuses HEAD is asked again with GET. */
+    private function headImage(string $path, string $token): array
+    {
+        $response = $this->crawler->fetch($this->crawlBase() . $path, $token, headOnly: true);
+        $refusesHead = \in_array($response['status'], [403, 405, 501], true);
+
+        return $refusesHead ? $this->crawler->fetch($this->crawlBase() . $path, $token) : $response;
+    }
+
+    /** @param string[] $images */
+    private function queueImages(int $runId, array $images): void
+    {
+        $queued = $this->store->imageCount($runId);
+        foreach ($images as $image) {
+            $full = $queued >= self::IMAGE_CAP;
+            $tooLong = \strlen($image) > 255;
+            if ($full) return;
+            if ($tooLong) continue;
+            if ($this->store->addPage(runId: $runId, url: $image, source: 'image', inSitemap: false)) $queued++;
+        }
     }
 
     /** @param string[] $links */
@@ -173,10 +198,11 @@ class AuditRunner
         ];
         $context['robotsDisallow'] = $this->isLive ? Checks::parseRobotsDisallow($this->robotsTxt) : [];
 
+        $pageCount = \count(\array_filter($pages, fn(array $page): bool => $page['source'] !== 'image'));
         $findings = Checks::run($pages, $context);
-        $score = Scoring::score($findings, \count($pages));
+        $score = Scoring::score($findings, $pageCount);
         $this->store->addFindings($runId, $findings);
-        $this->store->finishRun(id: $runId, status: 'done', pages: \count($pages), score: $score);
+        $this->store->finishRun(id: $runId, status: 'done', pages: $pageCount, score: $score);
 
         return $score;
     }

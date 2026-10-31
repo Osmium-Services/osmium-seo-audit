@@ -49,6 +49,8 @@ class Checks
         'soft_404' => ['label' => 'Missing pages do not return 404', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'A made-up address did not return a 404 status. Search engines may index empty or duplicate pages. Return a real 404 for unknown pages.'],
         'lang_missing' => ['label' => 'No page language', 'severity' => 'low', 'group' => 'Technical', 'fix' => 'The html tag has no lang attribute (for example lang="en-GB"), which helps search engines and screen readers (theme).'],
         'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content but tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
+        'mixed_content' => ['label' => 'Mixed content (http on an https page)', 'severity' => 'high', 'group' => 'Technical', 'fix' => 'The page loads an image, script or style over http while the site is on https. Browsers block or warn about it. Change the address to https, or make it relative.'],
+        'broken_image' => ['label' => 'Broken image', 'severity' => 'medium', 'group' => 'Content', 'fix' => 'An image on this page does not load, so visitors see a broken picture. Re-upload the file or remove the image.'],
     ];
 
     public const SEVERITIES = ['critical', 'high', 'medium', 'low'];
@@ -66,6 +68,16 @@ class Checks
     public static function run(array $pages, array $context = []): array
     {
         $thresholds = ($context['thresholds'] ?? []) + self::DEFAULT_THRESHOLDS;
+
+        $imageStatus = [];
+        $contentPages = [];
+        foreach ($pages as $page) {
+            $isImage = ($page['source'] ?? '') === 'image';
+            if ($isImage) $imageStatus[$page['url']] = (int) ($page['status_code'] ?? 0);
+            if (!$isImage) $contentPages[] = $page;
+        }
+        $pages = $contentPages;
+
         $byKey = [];
         foreach ($pages as $page) {
             $byKey[$page['url']] = $page;
@@ -81,6 +93,8 @@ class Checks
                 $isNoindex ? self::noindexFindings($page, $thresholds) : [],
                 ($hasHtml && !$isNoindex) ? self::contentFindings($page, $thresholds) : [],
                 $hasHtml ? self::linkFindings($page, $byKey) : [],
+                $hasHtml ? self::imageFindings($page, $imageStatus) : [],
+                $hasHtml ? self::mixedContentFindings($page, (string) ($context['baseUrl'] ?? '')) : [],
                 $hasHtml ? self::technicalFindings($page, $thresholds) : [],
             );
         }
@@ -249,6 +263,31 @@ class Checks
             $isRedirect = $status >= 300 && $status < 400;
             if ($isBroken) $findings[] = self::finding('broken_link', $page['url'], "Links to {$target} ({$status})");
             if ($isRedirect) $findings[] = self::finding('link_to_redirect', $page['url'], "Links to {$target}");
+        }
+
+        return $findings;
+    }
+
+    /** An http:// resource on a page of an https site (the site's own address decides, so dev over http is exempt) */
+    private static function mixedContentFindings(array $page, string $baseUrl): array
+    {
+        $siteIsHttps = \str_starts_with($baseUrl, 'https://');
+        $insecure = $page['insecure'] ?? [];
+        if (!$siteIsHttps || $insecure === []) return [];
+
+        $examples = \implode(', ', \array_slice($insecure, 0, 2));
+
+        return [self::finding('mixed_content', $page['url'], \count($insecure) . ' resource(s): ' . $examples)];
+    }
+
+    /** Each of the page's own images that did not load (a redirect is fine: it still shows) */
+    private static function imageFindings(array $page, array $imageStatus): array
+    {
+        $findings = [];
+        foreach ($page['images'] ?? [] as $image) {
+            $status = $imageStatus[$image] ?? null;
+            $isBroken = $status !== null && ($status === 0 || $status >= 400);
+            if ($isBroken) $findings[] = self::finding('broken_image', $page['url'], "{$image} (" . ($status === 0 ? 'no response' : $status) . ')');
         }
 
         return $findings;

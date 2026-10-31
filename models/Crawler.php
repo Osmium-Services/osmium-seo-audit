@@ -6,7 +6,7 @@ namespace Osmium\Services\SeoAudit\Models;
 
 /**
  * Fetches one URL of the site for the audit. Never follows redirects (the audit wants to see them), sends the
- * audit's User-Agent and its per-run token header, reads at most 3 MB.
+ * audit's User-Agent and its per-run token header, reads at most 3 MB. headOnly asks for the status without the body.
  */
 class Crawler
 {
@@ -17,13 +17,14 @@ class Crawler
     /**
      * @return array{status: int, headers: array<string, string>, body: string, ms: int, bytes: int, error: ?string}
      */
-    public function fetch(string $url, string $token): array
+    public function fetch(string $url, string $token, bool $headOnly = false): array
     {
         $headers = [];
         $body = '';
         $curl = \curl_init($url);
         \curl_setopt_array($curl, [
             CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_NOBODY => $headOnly,
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_TIMEOUT => 20,
             CURLOPT_CONNECTTIMEOUT => 8,

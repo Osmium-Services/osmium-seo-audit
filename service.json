@@ -1,7 +1,7 @@
 {
     "id": "osmium-seo-audit",
     "name": "Osmium SEO Audit",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Audits the whole site on demand for SEO problems and lists the fixes in priority order, with a score you can track between runs",
     "category": "marketing-analytics",
     "author": {

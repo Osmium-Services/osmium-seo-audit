@@ -79,6 +79,24 @@ HTML;
         $this->assertSame(['/apple.png'], $page['icons']['apple']);
     }
 
+    public function test_it_collects_this_sites_images_only(): void
+    {
+        $html = '<html><body><img src="/a.jpg"><img src="b.png?v=2"><img data-src="/lazy.webp"><img src="https://example.com/c.gif">'
+            . '<img src="https://cdn.other.com/x.jpg"><img src="data:image/png;base64,AAAA"><img src="/a.jpg"><img></body></html>';
+
+        $images = PageParser::parse($html, '/shop/', 'example.com')['images'];
+
+        $this->assertSame(['/a.jpg', '/shop/b.png?v=2', '/lazy.webp', '/c.gif'], $images);
+    }
+
+    public function test_it_lists_http_resources_but_not_plain_links(): void
+    {
+        $html = '<html><head><link rel="stylesheet" href="http://x.com/a.css"><link rel="canonical" href="http://example.com/"><script src="http://x.com/a.js"></script></head>'
+            . '<body><img src="http://x.com/i.png"><img src="https://x.com/ok.png"><iframe src="http://x.com/f"></iframe><a href="http://x.com/page">link</a></body></html>';
+
+        $this->assertSame(['http://x.com/a.css', 'http://x.com/a.js', 'http://x.com/i.png', 'http://x.com/f'], PageParser::parse($html, '/', 'example.com')['insecure']);
+    }
+
     public function test_cloudflare_proxy_links_are_not_internal_pages(): void
     {
         $html = '<html><body><a href="/cdn-cgi/l/email-protection#abc">mail</a><a href="/about/">About</a></body></html>';

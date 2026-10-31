@@ -103,7 +103,14 @@ class AuditStore extends Model
         return ['total' => (int) ($row['total'] ?? 0), 'done' => (int) ($row['done'] ?? 0)];
     }
 
-    /** @return array<int, array{id: int, url: string}> */
+    public function imageCount(int $runId): int
+    {
+        $row = $this->database->prepare(sql: $this->loadSqlFile('page-count-images.sql'), bindings: [':run' => $runId])->single();
+
+        return (int) ($row['total'] ?? 0);
+    }
+
+    /** @return array<int, array{id: int, url: string, source: string}> */
     public function pendingPages(int $runId, int $limit): array
     {
         return $this->database->prepare(sql: $this->loadSqlFile('page-pending.sql'), bindings: [':run' => $runId, ':limit' => $limit])->resultset();
@@ -122,7 +129,8 @@ class AuditStore extends Model
             ':viewport' => (int) ($facts['has_viewport'] ?? false), ':jsonld' => (int) ($facts['jsonld_invalid'] ?? 0),
             ':hash' => $facts['body_hash'] ?? null, ':ms' => $ms, ':bytes' => $bytes,
             ':links' => \json_encode($facts['links'] ?? []), ':lang' => $facts['lang'] ?? null,
-            ':icons' => isset($facts['icons']) ? \json_encode($facts['icons']) : null, ':id' => $id,
+            ':icons' => isset($facts['icons']) ? \json_encode($facts['icons']) : null,
+            ':images' => \json_encode($facts['images'] ?? []), ':insecure' => \json_encode($facts['insecure'] ?? []), ':id' => $id,
         ])->execute();
     }
 
@@ -132,6 +140,8 @@ class AuditStore extends Model
         $rows = $this->database->prepare(sql: $this->loadSqlFile('page-all.sql'), bindings: [':run' => $runId])->resultset();
         foreach ($rows as &$row) {
             $row['links'] = \json_decode((string) ($row['links'] ?? '[]'), associative: true) ?: [];
+            $row['insecure'] = \json_decode((string) ($row['insecure'] ?? '[]'), associative: true) ?: [];
+            $row['images'] = \json_decode((string) ($row['images'] ?? '[]'), associative: true) ?: [];
             $row['icons'] = \json_decode((string) ($row['icons'] ?? ''), associative: true) ?: ['icon' => [], 'apple' => []];
         }
 

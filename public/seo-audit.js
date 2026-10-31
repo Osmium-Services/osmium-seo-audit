@@ -28,7 +28,7 @@
     function showProgress(state) {
         const percent = state.total > 0 ? Math.round((state.done / state.total) * 100) : 0;
         label.textContent = 'Checking pages...';
-        count.textContent = state.done + ' of ' + state.total + ' pages';
+        count.textContent = state.done + ' of ' + state.total + ' items';
         bar.style.width = percent + '%';
     }
 

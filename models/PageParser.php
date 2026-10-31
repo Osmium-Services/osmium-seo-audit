@@ -48,6 +48,8 @@ class PageParser
             'links' => $links,
             'lang' => self::attribute($xpath, '//html', 'lang'),
             'icons' => self::icons($xpath),
+            'images' => self::imagePaths($xpath, $pagePath, $host),
+            'insecure' => self::insecureResources($xpath),
         ];
     }
 
@@ -171,8 +173,55 @@ class PageParser
         return \array_keys($paths);
     }
 
+    /**
+     * @return string[] up to 20 distinct http:// addresses the page loads as a resource (images, scripts, styles,
+     *                  frames, media). On an https site these are mixed content. Plain links are not resources.
+     */
+    private static function insecureResources(\DOMXPath $xpath): array
+    {
+        $found = [];
+        $nodes = $xpath->query('//img[@src]|//script[@src]|//iframe[@src]|//source[@src]|//video[@src]|//audio[@src]|//embed[@src]|//link[@href]');
+        foreach ($nodes as $node) {
+            $isLink = $node->nodeName === 'link';
+            $rel = \strtolower($node->getAttribute('rel'));
+            $loadsResource = !$isLink || \preg_match('/stylesheet|icon|preload|modulepreload/', $rel) === 1;
+            $address = \trim($node->getAttribute($isLink ? 'href' : 'src'));
+            if ($loadsResource && \stripos($address, 'http://') === 0) $found[$address] = true;
+        }
+
+        return \array_slice(\array_keys($found), 0, 20);
+    }
+
+    /** @return string[] distinct paths of this site's own images (src and data-src), resolved against the page */
+    private static function imagePaths(\DOMXPath $xpath, string $pagePath, string $host): array
+    {
+        $paths = [];
+        foreach ($xpath->query('//img') as $image) {
+            foreach (['src', 'data-src'] as $attribute) {
+                $path = self::resolveLocal(\trim($image->getAttribute($attribute)), $pagePath, $host, keepQuery: true);
+                if ($path !== null) $paths[$path] = true;
+            }
+        }
+
+        return \array_keys($paths);
+    }
+
     /** The path a link points to when it stays on this site, or null for anything else */
     public static function internalPath(string $href, string $pagePath, string $host): ?string
+    {
+        $path = self::resolveLocal($href, $pagePath, $host, keepQuery: false);
+        if ($path === null) return null;
+
+        $isFile = (bool) \preg_match('/\.(jpe?g|png|gif|webp|svg|ico|pdf|zip|css|js|xml|txt|mp4|mp3|docx?|xlsx?)$/i', $path);
+
+        return $isFile ? null : $path;
+    }
+
+    /**
+     * The path of an address on this site, resolved against the page it appears on, or null for another host, a
+     * non-page scheme (mailto, data) or Cloudflare's proxy paths.
+     */
+    private static function resolveLocal(string $href, string $pagePath, string $host, bool $keepQuery): ?string
     {
         $isEmpty = $href === '' || $href[0] === '#';
         if ($isEmpty) return null;
@@ -196,10 +245,9 @@ class PageParser
         $isProxyPath = \str_starts_with($path, '/cdn-cgi/'); // Cloudflare's own paths (email hiding) exist only through its proxy
         if ($isProxyPath) return null;
 
-        $isFile = (bool) \preg_match('/\.(jpe?g|png|gif|webp|svg|ico|pdf|zip|css|js|xml|txt|mp4|mp3|docx?|xlsx?)$/i', $path);
-        if ($isFile) return null;
+        if ($path === '') $path = '/';
 
-        return $path === '' ? '/' : $path;
+        return $keepQuery && isset($parts['query']) ? $path . '?' . $parts['query'] : $path;
     }
 
     private static function resolveRelative(string $path, string $pagePath): string

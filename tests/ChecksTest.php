@@ -227,6 +227,38 @@ class ChecksTest extends TestCase
         $this->assertNotContains('orphan_page', $this->keysFor($findings, '/moved'));
     }
 
+    public function test_broken_images_are_reported_on_the_page_and_image_rows_are_not_pages(): void
+    {
+        $pages = [
+            $this->page('/a/', ['images' => ['/ok.jpg', '/gone.jpg', '/moved.jpg', '/dead.jpg']]),
+            $this->page('/b/'),
+            $this->page('/ok.jpg', ['source' => 'image', 'in_sitemap' => 0, 'title' => null, 'description' => null, 'h1_count' => 0, 'word_count' => 0]),
+            $this->page('/gone.jpg', ['source' => 'image', 'in_sitemap' => 0, 'status_code' => 404, 'title' => null]),
+            $this->page('/moved.jpg', ['source' => 'image', 'in_sitemap' => 0, 'status_code' => 301]),
+            $this->page('/dead.jpg', ['source' => 'image', 'in_sitemap' => 0, 'status_code' => 0]),
+        ];
+
+        $findings = $this->audit($pages);
+
+        $this->assertSame(['broken_image', 'broken_image'], $this->keysFor($findings, '/a/'));
+        $this->assertSame([], $this->keysFor($findings, '/ok.jpg'));
+        $this->assertSame([], $this->keysFor($findings, '/gone.jpg'));
+        $this->assertStringContainsString('/gone.jpg (404)', \implode(' ', \array_column($findings, 'detail')));
+    }
+
+    public function test_http_resources_are_mixed_content_only_on_an_https_site(): void
+    {
+        $pages = [$this->page('/a/', ['insecure' => ['http://x.com/i.png', 'http://x.com/a.js', 'http://x.com/b.css']]), $this->page('/b/')];
+
+        $secure = $this->audit($pages, ['baseUrl' => 'https://example.com']);
+        $plain = $this->audit($pages, ['baseUrl' => 'http://example.com']);
+
+        $this->assertContains('mixed_content', $this->keysFor($secure, '/a/'));
+        $this->assertStringContainsString('3 resource(s): http://x.com/i.png, http://x.com/a.js', \implode(' ', \array_column($secure, 'detail')));
+        $this->assertNotContains('mixed_content', $this->keysFor($plain, '/a/'));
+        $this->assertNotContains('mixed_content', $this->keysFor($secure, '/b/'));
+    }
+
     public function test_links_to_broken_and_redirected_pages(): void
     {
         $pages = [
