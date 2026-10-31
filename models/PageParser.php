@@ -176,6 +176,9 @@ class PageParser
         $isRelative = $path === '' || $path[0] !== '/';
         if ($isRelative) $path = self::resolveRelative($path, $pagePath);
 
+        $isProxyPath = \str_starts_with($path, '/cdn-cgi/'); // Cloudflare's own paths (email hiding) exist only through its proxy
+        if ($isProxyPath) return null;
+
         $isFile = (bool) \preg_match('/\.(jpe?g|png|gif|webp|svg|ico|pdf|zip|css|js|xml|txt|mp4|mp3|docx?|xlsx?)$/i', $path);
         if ($isFile) return null;
 

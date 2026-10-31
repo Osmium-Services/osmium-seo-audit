@@ -67,6 +67,13 @@ HTML;
         $this->assertSame(['/about/', '/solar/contact/', '/shop/'], $this->parsed()['links']);
     }
 
+    public function test_cloudflare_proxy_links_are_not_internal_pages(): void
+    {
+        $html = '<html><body><a href="/cdn-cgi/l/email-protection#abc">mail</a><a href="/about/">About</a></body></html>';
+
+        $this->assertSame(['/about/'], PageParser::parse($html, '/', 'example.com')['links']);
+    }
+
     public function test_the_robots_header_is_added_to_the_meta_value(): void
     {
         $page = PageParser::parse('<html><head><meta name="robots" content="index"></head><body>x</body></html>', '/', 'example.com', 'noindex');
