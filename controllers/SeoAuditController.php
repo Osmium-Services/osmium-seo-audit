@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Osmium\Services\SeoAudit\Controllers;
 
-use Osmium\Core\Library\Input;
 use Osmium\Modules\Admin\Core\AdminController;
 use Osmium\Services\SeoAudit\Models\AuditRunner;
 use Osmium\Services\SeoAudit\Models\AuditSettings;
 use Osmium\Services\SeoAudit\Models\AuditStore;
 use Osmium\Services\SeoAudit\Models\Checks;
 use Osmium\Services\SeoAudit\Models\Crawler;
+use Osmium\Services\SeoAudit\Models\ReportExport;
 use Osmium\Services\SeoAudit\Models\RunDiff;
 use Osmium\Services\SeoAudit\Models\SeoAuditReport;
 
@@ -21,6 +21,7 @@ use Osmium\Services\SeoAudit\Models\SeoAuditReport;
  *   - index()    → /admin/seo-audit/            the report (latest run, or ?run=ID)
  *   - runs()     → /admin/seo-audit/runs/       the history
  *   - settings() → /admin/seo-audit/settings/
+ *   - download() → /admin/seo-audit/download/?run=ID   the run as a Markdown file
  *   - action()   → /admin/seo-audit/action/     start, step, get_items, save_settings
  */
 class SeoAuditController extends AdminController
@@ -31,7 +32,7 @@ class SeoAuditController extends AdminController
         $store->failStaleRuns();
         $running = $store->runningRun();
 
-        $requested = Input::get()->int(key: 'run');
+        $requested = $this->requestedRun();
         $run = $requested > 0 ? $store->run($requested) : null;
         $run ??= $this->latestFinished($store);
         $findings = $run === null ? [] : $store->findings((int) $run['id']);
@@ -74,6 +75,23 @@ class SeoAuditController extends AdminController
         $this->setView('seo-audit/settings.phtml');
     }
 
+    public function download(): void
+    {
+        $store = new AuditStore($this->osmium->dataSource);
+        $run = $store->run($this->requestedRun());
+        $isFinished = $run !== null && $run['status'] === 'done';
+        if (!$isFinished) $this->admin->jsonError('No finished audit with that number');
+
+        $siteUrl = (string) $this->osmium->config->site->FQDN;
+        $markdown = ReportExport::markdown($run, $store->findings((int) $run['id']), $siteUrl);
+        $filename = 'seo-audit-' . \date('Y-m-d', (int) \strtotime((string) $run['started_at'])) . '-run' . (int) $run['id'] . '.md';
+
+        \header('Content-Type: text/markdown; charset=UTF-8');
+        \header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo $markdown;
+        exit;
+    }
+
     public function action()
     {
         \header('Content-Type: application/json');
@@ -100,6 +118,12 @@ class SeoAuditController extends AdminController
         } catch (\Exception $e) {
             $this->admin->jsonError($e->getMessage());
         }
+    }
+
+    /** The ?run= the router stashed when it redirected to the site's slash form (so $_GET no longer holds it) */
+    private function requestedRun(): int
+    {
+        return (int) $this->osmium->getStashedParam(key: 'run', default: 0);
     }
 
     private function latestFinished(AuditStore $store): ?array

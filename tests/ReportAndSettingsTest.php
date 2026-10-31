@@ -6,6 +6,7 @@ namespace Tests\Services\SeoAudit;
 
 use Osmium\Services\SeoAudit\Models\AuditSettings;
 use Osmium\Services\SeoAudit\Models\Checks;
+use Osmium\Services\SeoAudit\Models\ReportExport;
 use Osmium\Services\SeoAudit\Models\RunDiff;
 use Osmium\Services\SeoAudit\Models\SeoAuditHooks;
 use Osmium\Services\SeoAudit\Models\SeoAuditReport;
@@ -15,6 +16,7 @@ require_once __DIR__ . '/../models/Checks.php';
 require_once __DIR__ . '/../models/PageParser.php';
 require_once __DIR__ . '/../models/RunDiff.php';
 require_once __DIR__ . '/../models/SeoAuditReport.php';
+require_once __DIR__ . '/../models/ReportExport.php';
 require_once __DIR__ . '/../models/AuditSettings.php';
 require_once __DIR__ . '/../models/Crawler.php';
 require_once __DIR__ . '/../models/SeoAuditHooks.php';
@@ -93,5 +95,31 @@ class ReportAndSettingsTest extends TestCase
     {
         $this->assertNull(SeoAuditHooks::requestInternal(['headers' => []]));
         $this->assertNull(SeoAuditHooks::requestInternal(['headers' => ['X-Osmium-Audit' => \str_repeat('a', 32)]]));
+    }
+
+    public function test_the_markdown_report_lists_fixes_by_priority_with_their_pages(): void
+    {
+        $run = ['id' => 4, 'started_at' => '2026-10-31 10:00:00', 'pages_checked' => 12, 'score' => 71];
+        $findings = [
+            ['check_key' => 'page_error', 'severity' => 'critical', 'page_url' => '/gone', 'detail' => 'Status 404'],
+            ['check_key' => 'h1_missing', 'severity' => 'high', 'page_url' => '/a', 'detail' => null],
+            ['check_key' => 'h1_missing', 'severity' => 'high', 'page_url' => '/b', 'detail' => null],
+        ];
+
+        $markdown = ReportExport::markdown($run, $findings, 'https://example.com');
+
+        $this->assertStringContainsString('# SEO audit: https://example.com', $markdown);
+        $this->assertStringContainsString('12 pages checked. Site score: 71/100.', $markdown);
+        $this->assertStringContainsString('| Critical | 1 |', $markdown);
+        $this->assertStringContainsString('- `/gone` - Status 404', $markdown);
+        $this->assertStringContainsString('### Missing main heading (h1) (2)', $markdown);
+        $this->assertLessThan(\strpos($markdown, '## High'), \strpos($markdown, '## Critical'));
+    }
+
+    public function test_an_audit_with_no_findings_says_so(): void
+    {
+        $markdown = ReportExport::markdown(['id' => 1, 'started_at' => '2026-10-31 10:00:00', 'pages_checked' => 3, 'score' => 100], [], 'https://example.com');
+
+        $this->assertStringContainsString('Nothing to fix.', $markdown);
     }
 }
