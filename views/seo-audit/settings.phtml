@@ -1,0 +1,49 @@
+<?php
+
+$settings = $admin['settings'];
+?>
+<div class="d-flex justify-content-between align-items-center py-3 mb-4">
+    <h4 class="mb-0">
+        <span class="text-muted fw-light">Traffic / SEO Audit /</span> Settings
+    </h4>
+    <a href="<?= \htmlspecialchars($adminUrl('seo-audit/')) ?>" class="btn btn-outline-secondary"><i class="bx bx-arrow-back me-1"></i>Back to report</a>
+</div>
+
+<form id="seo-settings-form" class="card">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="pageCap">Most pages per run</label>
+                <input type="number" class="form-control" id="pageCap" min="1" max="2000" value="<?= (int) $settings['pageCap'] ?>">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="delayMs">Pause between requests (ms)</label>
+                <input type="number" class="form-control" id="delayMs" min="0" max="5000" value="<?= (int) $settings['delayMs'] ?>">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="baseUrl">Crawl address</label>
+                <input type="text" class="form-control" id="baseUrl" placeholder="<?= \htmlspecialchars($admin['siteUrl']) ?>" value="<?= \htmlspecialchars($settings['baseUrl']) ?>">
+                <div class="form-text">Leave blank to use the site address. Needed only when this server cannot reach its own public address.</div>
+            </div>
+        </div>
+        <hr>
+        <h6>Checks</h6>
+        <div class="row g-3">
+            <?php foreach ($admin['thresholdLabels'] as $name => $label) : ?>
+                <div class="col-md-4">
+                    <label class="form-label" for="threshold-<?= $name ?>"><?= \htmlspecialchars($label) ?></label>
+                    <input type="number" class="form-control seo-threshold" id="threshold-<?= $name ?>" data-name="<?= $name ?>" min="1" value="<?= (int) $settings['thresholds'][$name] ?>">
+                </div>
+            <?php endforeach ?>
+        </div>
+    </div>
+    <div class="card-footer d-flex align-items-center gap-3">
+        <button type="submit" class="btn btn-primary">Save settings</button>
+        <span id="seo-settings-result" class="small"></span>
+    </div>
+</form>
+
+<script nonce="<?= $cspNonce ?>">
+window.seoAuditConfig = { actionUrl: '<?= $adminUrl('seo-audit/action/') ?>' };
+</script>
+<script src="/assets/services/osmium-seo-audit/seo-audit-settings.js<?= $adminAssetVersion('/assets/services/osmium-seo-audit/seo-audit-settings.js') ?>"></script>

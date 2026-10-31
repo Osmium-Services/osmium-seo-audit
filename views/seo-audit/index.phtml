@@ -1,0 +1,73 @@
+<?php
+
+use Osmium\Modules\Admin\Core\ListView;
+
+$listContext = ['adminUrl' => $adminUrl, 'isAdmin' => $admin['isAdmin'] ?? false];
+$run = $admin['run'];
+$counts = $admin['counts'];
+$severityCards = [
+    ['key' => 'critical', 'label' => 'Critical', 'class' => 'danger', 'icon' => 'bx-error-circle'],
+    ['key' => 'high', 'label' => 'High', 'class' => 'warning', 'icon' => 'bx-error'],
+    ['key' => 'medium', 'label' => 'Medium', 'class' => 'info', 'icon' => 'bx-info-circle'],
+    ['key' => 'low', 'label' => 'Low', 'class' => 'secondary', 'icon' => 'bx-minus-circle'],
+];
+?>
+<div class="d-flex justify-content-between align-items-center py-3 mb-4">
+    <h4 class="mb-0">
+        <span class="text-muted fw-light">Traffic /</span> SEO Audit
+    </h4>
+    <div class="d-flex gap-2">
+        <a href="<?= \htmlspecialchars($adminUrl('seo-audit/runs/')) ?>" class="btn btn-outline-secondary"><i class="bx bx-history me-1"></i>Runs</a>
+        <?php if ($admin['isAdmin'] ?? false) : ?>
+            <a href="<?= \htmlspecialchars($adminUrl('seo-audit/settings/')) ?>" class="btn btn-outline-secondary"><i class="bx bx-cog me-1"></i>Settings</a>
+        <?php endif ?>
+        <button type="button" class="btn btn-primary" id="seo-run-btn"><i class="bx bx-play me-1"></i>Run audit</button>
+    </div>
+</div>
+
+<div class="card mb-4 d-none" id="seo-progress-card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between mb-2"><strong id="seo-progress-label">Starting...</strong><span id="seo-progress-count"></span></div>
+        <div class="progress"><div class="progress-bar" id="seo-progress-bar"></div></div>
+        <small class="text-muted d-block mt-2">Checking <?= \htmlspecialchars($admin['crawlBase']) ?>. Keep this page open until it finishes.</small>
+    </div>
+</div>
+<div class="alert alert-danger d-none" id="seo-error"></div>
+
+<?php if ($run === null) : ?>
+    <div class="card"><div class="card-body text-center py-5">
+        <i class="bx bx-search-alt-2 display-4 text-muted"></i>
+        <h5 class="mt-3">No audit yet</h5>
+        <p class="text-muted mb-0">Press Run audit to check every page of the site and list what to fix first.</p>
+    </div></div>
+<?php else : ?>
+    <p class="text-muted">Audit of <?= \htmlspecialchars($admin['startedLabel']) ?>: <?= (int) $run['pages_checked'] ?> pages checked.</p>
+    <div class="row mb-4">
+        <div class="col-6 col-lg-2 mb-3 mb-lg-0">
+            <div class="card h-100"><div class="card-body">
+                <h2 class="mb-0"><?= $run['score'] === null ? '-' : (int) $run['score'] ?><small class="text-muted fs-6"> / 100</small></h2>
+                <small class="text-muted">Site score</small>
+            </div></div>
+        </div>
+        <?php foreach ($severityCards as $card) : ?>
+            <div class="col-6 col-lg-2 mb-3 mb-lg-0">
+                <div class="card h-100"><div class="card-body d-flex align-items-center">
+                    <div class="avatar avatar-md me-3"><span class="avatar-initial rounded bg-label-<?= $card['class'] ?>"><i class="bx <?= $card['icon'] ?>"></i></span></div>
+                    <div><h4 class="mb-0"><?= (int) $counts[$card['key']] ?></h4><small class="text-muted"><?= $card['label'] ?></small></div>
+                </div></div>
+            </div>
+        <?php endforeach ?>
+    </div>
+
+    <?= ListView::render($admin['lists']['fixes'], $admin['fixes'], $listContext) ?>
+<?php endif ?>
+
+<script nonce="<?= $cspNonce ?>">
+window.seoAuditConfig = {
+    actionUrl: '<?= $adminUrl('seo-audit/action/') ?>',
+    reportUrl: '<?= $adminUrl('seo-audit/') ?>',
+    runningId: <?= (int) $admin['runningId'] ?>
+};
+</script>
+<script src="/assets/admin/js/list-view.js<?= $adminAssetVersion('/assets/admin/js/list-view.js') ?>"></script>
+<script src="/assets/services/osmium-seo-audit/seo-audit.js<?= $adminAssetVersion('/assets/services/osmium-seo-audit/seo-audit.js') ?>"></script>

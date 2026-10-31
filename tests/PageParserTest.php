@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Services\SeoAudit;
+
+use Osmium\Services\SeoAudit\Models\PageParser;
+use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/../models/PageParser.php';
+
+class PageParserTest extends TestCase
+{
+    private const PAGE = <<<'HTML'
+<!doctype html><html><head><title> Solar panels  for homes </title>
+<meta name="description" content="Fitted by experts">
+<meta name="robots" content="index,follow">
+<meta name="viewport" content="width=device-width">
+<meta property="og:title" content="Solar"><meta property="og:image" content="/a.jpg">
+<link rel="canonical" href="https://example.com/solar/">
+<script type="application/ld+json">{"@type":"Thing"}</script>
+<script type="application/ld+json">{broken</script>
+<script>var hidden = "not counted words";</script></head>
+<body><h1>Solar</h1><h2>Why</h2><h4>Skipped</h4>
+<p>One two three four five.</p>
+<img src="a.jpg" alt="A panel"><img src="b.jpg"><img src="c.jpg" alt="">
+<a href="/about/">About</a><a href="contact/">Contact</a><a href="https://example.com/shop/?x=1#top">Shop</a>
+<a href="https://other.com/x/">Other</a><a href="mailto:a@b.c">Mail</a><a href="#top">Top</a><a href="/files/a.pdf">PDF</a>
+</body></html>
+HTML;
+
+    private function parsed(): array
+    {
+        return PageParser::parse(self::PAGE, '/solar/', 'example.com');
+    }
+
+    public function test_it_reads_the_head_tags(): void
+    {
+        $page = $this->parsed();
+
+        $this->assertSame('Solar panels for homes', $page['title']);
+        $this->assertSame('Fitted by experts', $page['description']);
+        $this->assertSame('https://example.com/solar/', $page['canonical']);
+        $this->assertSame('index,follow', $page['robots']);
+        $this->assertTrue($page['has_viewport']);
+        $this->assertTrue($page['og_title']);
+        $this->assertTrue($page['og_image']);
+    }
+
+    public function test_it_counts_headings_images_and_broken_structured_data(): void
+    {
+        $page = $this->parsed();
+
+        $this->assertSame(1, $page['h1_count']);
+        $this->assertSame('1,2,4', $page['heading_levels']);
+        $this->assertSame(1, $page['images_missing_alt']);
+        $this->assertSame(1, $page['jsonld_invalid']);
+    }
+
+    public function test_word_count_ignores_scripts(): void
+    {
+        $this->assertSame(15, $this->parsed()['word_count']);
+    }
+
+    public function test_internal_links_are_resolved_and_external_ones_dropped(): void
+    {
+        $this->assertSame(['/about/', '/solar/contact/', '/shop/'], $this->parsed()['links']);
+    }
+
+    public function test_the_robots_header_is_added_to_the_meta_value(): void
+    {
+        $page = PageParser::parse('<html><head><meta name="robots" content="index"></head><body>x</body></html>', '/', 'example.com', 'noindex');
+
+        $this->assertTrue(PageParser::isNoindex($page['robots']));
+    }
+
+    public function test_an_empty_page_does_not_crash(): void
+    {
+        $page = PageParser::parse('', '/', 'example.com');
+
+        $this->assertSame('', $page['title']);
+        $this->assertSame(0, $page['word_count']);
+        $this->assertNull($page['body_hash']);
+    }
+}

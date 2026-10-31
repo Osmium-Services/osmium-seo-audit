@@ -1,0 +1,15 @@
+<?php
+
+use Osmium\Modules\Admin\Core\ListView;
+
+$listContext = ['adminUrl' => $adminUrl, 'isAdmin' => $admin['isAdmin'] ?? false];
+?>
+<div class="d-flex justify-content-between align-items-center py-3 mb-4">
+    <h4 class="mb-0">
+        <span class="text-muted fw-light">Traffic / SEO Audit /</span> Runs
+    </h4>
+    <a href="<?= \htmlspecialchars($adminUrl('seo-audit/')) ?>" class="btn btn-outline-secondary"><i class="bx bx-arrow-back me-1"></i>Back to report</a>
+</div>
+
+<?= ListView::render($admin['lists']['runs'], $admin['runs'], $listContext) ?>
+<script src="/assets/admin/js/list-view.js<?= $adminAssetVersion('/assets/admin/js/list-view.js') ?>"></script>
