@@ -63,7 +63,12 @@ class SeoAuditController extends AdminController
 
     public function settings(): void
     {
-        $this->data['admin']['isAdmin'] = $this->isAdmin();
+        if (!$this->isAdmin()) {
+            $this->redirect('seo-audit/');
+            return;
+        }
+
+        $this->data['admin']['isAdmin'] = true;
         $this->data['admin']['settings'] = AuditSettings::get();
         $this->data['admin']['thresholdLabels'] = [
             'titleMin' => 'Title: shortest (characters)', 'titleMax' => 'Title: longest (characters)',
