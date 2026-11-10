@@ -3,7 +3,22 @@
 
     const config = window.seoAuditConfig || {};
     const form = document.getElementById('seo-settings-form');
-    const result = document.getElementById('seo-settings-result');
+    const alertSlot = document.getElementById('seo-settings-alert');
+
+    // Same markup as the standard settings-saved banner the other settings pages print
+    function showAlert(type, message) {
+        const box = document.createElement('div');
+        box.className = 'alert alert-' + type + ' alert-dismissible fade show';
+        box.setAttribute('role', 'alert');
+        box.appendChild(document.createTextNode(message));
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'btn-close';
+        close.setAttribute('data-bs-dismiss', 'alert');
+        close.setAttribute('aria-label', 'Close');
+        box.appendChild(close);
+        alertSlot.replaceChildren(box);
+    }
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -27,7 +42,6 @@
         });
         const data = await response.json();
 
-        result.className = 'small ' + (data.success ? 'text-success' : 'text-danger');
-        result.textContent = data.success ? 'Saved' : (data.error || 'Could not save');
+        showAlert(data.success ? 'success' : 'danger', data.success ? 'Settings saved successfully!' : (data.error || 'Could not save'));
     });
 })();
