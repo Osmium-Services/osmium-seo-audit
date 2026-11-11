@@ -15,7 +15,7 @@ class AuditSettings
     /** @return array{pageCap: int, delayMs: int, baseUrl: string, thresholds: array<string, int>} */
     public static function defaults(): array
     {
-        return ['pageCap' => 300, 'delayMs' => 200, 'baseUrl' => '', 'thresholds' => Checks::DEFAULT_THRESHOLDS];
+        return ['pageCap' => 100, 'delayMs' => 1000, 'baseUrl' => '', 'thresholds' => Checks::DEFAULT_THRESHOLDS];
     }
 
     /** @return array{pageCap: int, delayMs: int, baseUrl: string, thresholds: array<string, int>} */
@@ -68,7 +68,7 @@ class AuditSettings
 
         return [
             'pageCap' => \max(1, \min(2000, (int) ($input['pageCap'] ?? $defaults['pageCap']))),
-            'delayMs' => \max(0, \min(5000, (int) ($input['delayMs'] ?? $defaults['delayMs']))),
+            'delayMs' => \max(500, \min(5000, (int) ($input['delayMs'] ?? $defaults['delayMs']))),
             'baseUrl' => \rtrim(\trim((string) ($input['baseUrl'] ?? '')), '/'),
             'thresholds' => $thresholds,
         ];

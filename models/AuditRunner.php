@@ -10,7 +10,7 @@ namespace Osmium\Services\SeoAudit\Models;
  */
 class AuditRunner
 {
-    private const BATCH = 5;
+    private const BATCH = 2;
     private const IMAGE_CAP = 500; // images checked per run, on top of the page limit
 
     /**
@@ -82,7 +82,7 @@ class AuditRunner
      *
      * @return array{status: string, done: int, total: int, finished: bool, score: ?int}
      */
-    public function step(int $runId, float $budgetSeconds = 20.0): array
+    public function step(int $runId, float $budgetSeconds = 4.0): array
     {
         $run = $this->store->run($runId);
         $notRunning = $run === null || $run['status'] !== 'running';
@@ -93,8 +93,8 @@ class AuditRunner
         $pending = $this->store->pendingPages($runId, self::BATCH);
         while ($pending !== []) {
             foreach ($pending as $page) {
-                $this->fetchPage($runId, $page, $token, (int) $run['page_cap']);
-                \usleep($this->settings['delayMs'] * 1000);
+                $took = $this->fetchPage($runId, $page, $token, (int) $run['page_cap']);
+                \usleep(\max($this->settings['delayMs'], $took * 2) * 1000); // back off when the site is slow
             }
 
             $outOfTime = (\microtime(true) - $started) > $budgetSeconds;
@@ -117,7 +117,7 @@ class AuditRunner
     }
 
     /** @param array{id: int, url: string, source: string} $page */
-    private function fetchPage(int $runId, array $page, string $token, int $pageCap): void
+    private function fetchPage(int $runId, array $page, string $token, int $pageCap): int
     {
         $isImage = $page['source'] === 'image';
         $response = $isImage ? $this->headImage($page['url'], $token) : $this->crawler->fetch($this->crawlBase() . $page['url'], $token);
@@ -133,6 +133,8 @@ class AuditRunner
             id: (int) $page['id'], status: $status, redirect: $this->redirectTarget($response['headers']['location'] ?? null),
             error: $response['error'], facts: $facts, ms: $response['ms'], bytes: $response['bytes'],
         );
+
+        return $response['ms'];
     }
 
     /** The status of an image without downloading it. A server that refuses HEAD is asked again with GET. */

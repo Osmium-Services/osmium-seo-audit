@@ -27,7 +27,7 @@ $settings = $admin['settings'];
                         </div>
                         <div class="col-12">
                             <label class="form-label" for="delayMs">Pause between requests (ms)</label>
-                            <input type="number" class="form-control" id="delayMs" min="0" max="5000" value="<?= (int) $settings['delayMs'] ?>">
+                            <input type="number" class="form-control" id="delayMs" min="500" max="5000" value="<?= (int) $settings['delayMs'] ?>">
                         </div>
                         <div class="col-12">
                             <label class="form-label" for="baseUrl">Crawl address</label>

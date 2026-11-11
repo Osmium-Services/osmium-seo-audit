@@ -72,7 +72,7 @@ class ReportAndSettingsTest extends TestCase
         $saved = AuditSettings::save(['pageCap' => 99999, 'delayMs' => -5, 'baseUrl' => 'http://localhost/', 'thresholds' => ['titleMax' => 70]], $this->settingsPath);
 
         $this->assertSame(2000, $saved['pageCap']);
-        $this->assertSame(0, $saved['delayMs']);
+        $this->assertSame(500, $saved['delayMs']);
         $this->assertSame('http://localhost', $saved['baseUrl']);
         $this->assertSame(70, AuditSettings::get($this->settingsPath)['thresholds']['titleMax']);
         $this->assertSame(Checks::DEFAULT_THRESHOLDS['titleMin'], AuditSettings::get($this->settingsPath)['thresholds']['titleMin']);

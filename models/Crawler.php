@@ -26,7 +26,7 @@ class Crawler
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_NOBODY => $headOnly,
             CURLOPT_RETURNTRANSFER => false,
-            CURLOPT_TIMEOUT => 20,
+            CURLOPT_TIMEOUT => 10,
             CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_USERAGENT => self::USER_AGENT,
             CURLOPT_HTTPHEADER => [self::TOKEN_HEADER . ': ' . $token, 'Accept: text/html,application/xhtml+xml'],
