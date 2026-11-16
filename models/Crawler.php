@@ -51,7 +51,6 @@ class Crawler
         $tooBigAbort = \curl_errno($curl) === CURLE_WRITE_ERROR;
         $error = ($ok === false && !$tooBigAbort) ? \curl_error($curl) : null;
         $status = (int) \curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-        \curl_close($curl);
 
         return ['status' => $status, 'headers' => $headers, 'body' => $body, 'ms' => $ms, 'bytes' => \strlen($body), 'error' => $error];
     }
