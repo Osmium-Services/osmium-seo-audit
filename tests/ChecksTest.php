@@ -152,6 +152,21 @@ class ChecksTest extends TestCase
         $this->assertSame(['noindex_content'], $this->keysFor($findings, '/b/'));
     }
 
+    public function test_noindex_nofollow_is_a_deliberate_hold_and_is_not_raised(): void
+    {
+        $pages = [
+            $this->page('/hold/', ['robots' => 'noindex,nofollow', 'in_sitemap' => 0, 'word_count' => 900]),
+            $this->page('/none/', ['robots' => 'none', 'in_sitemap' => 0, 'word_count' => 900]),
+            $this->page('/forgotten/', ['robots' => 'noindex,follow', 'in_sitemap' => 0, 'word_count' => 900]),
+        ];
+
+        $findings = $this->audit($pages);
+
+        $this->assertSame([], $this->keysFor($findings, '/hold/'));
+        $this->assertSame([], $this->keysFor($findings, '/none/'));
+        $this->assertSame(['noindex_content'], $this->keysFor($findings, '/forgotten/'));
+    }
+
     public function test_noindex_copy_of_an_indexable_page_is_not_raised(): void
     {
         $text = \implode(' ', \array_map(static fn (int $i): string => 'word' . ($i * 7 % 53) . 'x' . $i, \range(1, 400)));

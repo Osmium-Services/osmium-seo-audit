@@ -54,6 +54,14 @@ class PageParser
         ];
     }
 
+    /** Whether a robots value tells search engines to neither index the page nor follow its links (a deliberate hold, not an oversight) */
+    public static function isNoindexNofollow(string $robots): bool
+    {
+        $robots = \strtolower($robots);
+
+        return \str_contains($robots, 'none') || (\str_contains($robots, 'noindex') && \str_contains($robots, 'nofollow'));
+    }
+
     /** Whether a robots value (meta and header joined) tells search engines not to index */
     public static function isNoindex(string $robots): bool
     {

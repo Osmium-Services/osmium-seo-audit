@@ -48,7 +48,7 @@ class Checks
         'sitemap_missing' => ['label' => 'Sitemap missing or empty', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'The live site has no usable sitemap.xml, so search engines find pages only by following links.'],
         'soft_404' => ['label' => 'Missing pages do not return 404', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'A made-up address did not return a 404 status. Search engines may index empty or duplicate pages. Return a real 404 for unknown pages.'],
         'lang_missing' => ['label' => 'No page language', 'severity' => 'low', 'group' => 'Technical', 'fix' => 'The html tag has no lang attribute (for example lang="en-GB"), which helps search engines and screen readers (theme).'],
-        'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content, is not a near-copy of an indexable page, and tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
+        'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content, is not a near-copy of an indexable page, is not set to noindex and nofollow, and tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
         'mixed_content' => ['label' => 'Mixed content (http on an https page)', 'severity' => 'high', 'group' => 'Technical', 'fix' => 'The page loads an image, script or style over http while the site is on https. Browsers block or warn about it. Change the address to https, or make it relative.'],
         'broken_image' => ['label' => 'Broken image', 'severity' => 'medium', 'group' => 'Content', 'fix' => 'An image on this page does not load, so visitors see a broken picture. Re-upload the file or remove the image.'],
     ];
@@ -200,6 +200,7 @@ class Checks
     {
         $words = (int) ($page['word_count'] ?? 0);
         if ($words < $thresholds['noindexWords']) return [];
+        if (PageParser::isNoindexNofollow((string) ($page['robots'] ?? ''))) return []; // noindex plus nofollow is a deliberate hold
         if (self::isNearDuplicate((string) ($page['body_simhash'] ?? ''), $indexableHashes, $thresholds['nearDuplicateBits'])) return [];
 
         return [self::finding('noindex_content', $page['url'], "{$words} words, but marked noindex")];
