@@ -50,6 +50,7 @@ $severityCards = [
             <div class="card h-100"><div class="card-body">
                 <h2 class="mb-0"><?= $run['score'] === null ? '-' : (int) $run['score'] ?><small class="text-muted fs-6"> / 100</small></h2>
                 <small class="text-muted">Site score</small>
+                <?php if ($admin['rating'] !== null) : ?><span class="badge bg-label-<?= $admin['rating']['class'] ?> ms-2"><?= $admin['rating']['label'] ?></span><?php endif; ?>
             </div></div>
         </div>
         <?php foreach ($severityCards as $card) : ?>

@@ -19,11 +19,13 @@ class ReportExport
     public static function markdown(array $run, array $findings, string $siteUrl): string
     {
         $counts = SeoAuditReport::severityCounts($findings);
+        $score = $run['score'] === null ? null : (int) $run['score'];
+        $rating = Scoring::rating($score, $counts['critical'], $counts['high']);
         $lines = [
             '# SEO audit: ' . $siteUrl,
             '',
             'Run ' . (int) $run['id'] . ' on ' . \date('d M Y H:i', (int) \strtotime((string) $run['started_at'])) . '. '
-                . (int) $run['pages_checked'] . ' pages checked. Site score: ' . ($run['score'] === null ? 'n/a' : (int) $run['score'] . '/100') . '.',
+                . (int) $run['pages_checked'] . ' pages checked. Site score: ' . ($score === null ? 'n/a' : $score . '/100 (' . $rating . ')') . '.',
             '',
             'Fix in the order below: Critical stops pages being indexed, High hurts ranking or clicks. Page paths are relative to the site.',
             '',

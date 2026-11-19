@@ -12,6 +12,16 @@ class Scoring
 {
     private const WEIGHTS = ['critical' => 25, 'high' => 10, 'medium' => 4, 'low' => 1];
 
+    /** Traffic-light rating: any Critical finding or a score under 70 is red; any High finding or under 90 is amber */
+    public static function rating(?int $score, int $critical, int $high): ?string
+    {
+        if ($score === null) return null;
+        if ($critical > 0 || $score < 70) return 'red';
+        if ($high > 0 || $score < 90) return 'amber';
+
+        return 'green';
+    }
+
     /**
      * @param array<int, array{check_key: string, severity: string, page_url: ?string}> $findings
      */

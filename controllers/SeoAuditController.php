@@ -42,6 +42,9 @@ class SeoAuditController extends AdminController
         $this->data['admin']['run'] = $run;
         $this->data['admin']['runningId'] = $running === null ? 0 : (int) $running['id'];
         $this->data['admin']['counts'] = SeoAuditReport::severityCounts($findings);
+        $this->data['admin']['rating'] = $run === null ? null : SeoAuditReport::ratingBadge(
+            $run['score'] === null ? null : (int) $run['score'], $this->data['admin']['counts']['critical'], $this->data['admin']['counts']['high'],
+        );
         $this->data['admin']['fixes'] = $run === null ? [] : SeoAuditReport::fixRows((int) $run['id'], $findings);
         $this->data['admin']['startedLabel'] = $run === null ? '' : \date('d M Y H:i', (int) \strtotime((string) $run['started_at']));
         $this->data['admin']['crawlBase'] = $this->settingsRunner()->crawlBase();

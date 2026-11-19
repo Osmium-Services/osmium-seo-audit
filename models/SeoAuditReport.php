@@ -9,6 +9,8 @@ namespace Osmium\Services\SeoAudit\Models;
  */
 class SeoAuditReport
 {
+    private const RATING_CLASS = ['red' => 'danger', 'amber' => 'warning', 'green' => 'success'];
+
     private const SEVERITY_CLASS = ['critical' => 'danger', 'high' => 'warning', 'medium' => 'info', 'low' => 'secondary'];
 
     /**
@@ -70,6 +72,14 @@ class SeoAuditReport
         return $counts;
     }
 
+    /** @return array{label: string, class: string}|null the traffic-light badge for a score, or null when the run has none */
+    public static function ratingBadge(?int $score, int $critical, int $high): ?array
+    {
+        $rating = Scoring::rating($score, $critical, $high);
+
+        return $rating === null ? null : ['label' => \ucfirst($rating), 'class' => self::RATING_CLASS[$rating]];
+    }
+
     /**
      * @param array<string, mixed> $run
      * @param array{new: int, fixed: int, unchanged: int}|null $diff
@@ -85,6 +95,7 @@ class SeoAuditReport
             'statusLabel' => \ucfirst((string) $run['status']),
             'scoreLabel' => $score === null ? '-' : $score . ($scoreMove ? ' (' . ($scoreMove > 0 ? '+' : '') . $scoreMove . ')' : ''),
             'scoreSort' => $score ?? -1,
+            'rating' => self::ratingBadge($score, (int) ($run['critical_count'] ?? 0), (int) ($run['high_count'] ?? 0)),
             'changeLabel' => $diff === null ? 'First audit' : "{$diff['fixed']} fixed, {$diff['new']} new, {$diff['unchanged']} unchanged",
         ];
     }

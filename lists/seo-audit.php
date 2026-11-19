@@ -48,6 +48,7 @@ return [
             ['key' => 'startedFormatted', 'label' => 'Started', 'type' => 'html', 'sortKey' => 'id', 'nowrap' => true, 'render' => fn(array $row, array $context): string => '<a href="' . \htmlspecialchars($context['adminUrl']('seo-audit/?run=' . (int) $row['id'])) . '">' . \htmlspecialchars((string) $row['startedFormatted']) . '</a>'],
             ['key' => 'statusLabel', 'label' => 'Status', 'type' => 'text', 'nowrap' => true],
             ['key' => 'scoreLabel', 'label' => 'Score', 'type' => 'text', 'strong' => true, 'align' => 'end', 'sortKey' => 'scoreSort'],
+            ['key' => 'rating', 'label' => 'Rating', 'type' => 'html', 'render' => fn(array $row, array $context): string => $row['rating'] === null ? '' : '<span class="badge bg-label-' . $row['rating']['class'] . '">' . $row['rating']['label'] . '</span>'],
             ['key' => 'pages_checked', 'label' => 'Pages', 'type' => 'text', 'align' => 'end'],
             ['key' => 'finding_count', 'label' => 'Issues', 'type' => 'text', 'align' => 'end'],
             ['key' => 'changeLabel', 'label' => 'Since previous run', 'type' => 'text', 'fill' => true, 'small' => true],

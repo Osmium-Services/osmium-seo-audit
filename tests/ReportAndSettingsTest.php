@@ -8,11 +8,13 @@ use Osmium\Services\SeoAudit\Models\AuditSettings;
 use Osmium\Services\SeoAudit\Models\Checks;
 use Osmium\Services\SeoAudit\Models\ReportExport;
 use Osmium\Services\SeoAudit\Models\RunDiff;
+use Osmium\Services\SeoAudit\Models\Scoring;
 use Osmium\Services\SeoAudit\Models\SeoAuditHooks;
 use Osmium\Services\SeoAudit\Models\SeoAuditReport;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../models/Checks.php';
+require_once __DIR__ . '/../models/Scoring.php';
 require_once __DIR__ . '/../models/PageParser.php';
 require_once __DIR__ . '/../models/RunDiff.php';
 require_once __DIR__ . '/../models/SeoAuditReport.php';
@@ -97,6 +99,17 @@ class ReportAndSettingsTest extends TestCase
         $this->assertNull(SeoAuditHooks::requestInternal(['headers' => ['X-Osmium-Audit' => \str_repeat('a', 32)]]));
     }
 
+    public function test_rating_is_red_amber_or_green_from_severity_then_score(): void
+    {
+        $this->assertSame('green', Scoring::rating(98, 0, 0));
+        $this->assertSame('amber', Scoring::rating(98, 0, 1));
+        $this->assertSame('amber', Scoring::rating(89, 0, 0));
+        $this->assertSame('red', Scoring::rating(98, 1, 0));
+        $this->assertSame('red', Scoring::rating(69, 0, 0));
+        $this->assertNull(Scoring::rating(null, 0, 0));
+        $this->assertSame(['label' => 'Green', 'class' => 'success'], SeoAuditReport::ratingBadge(95, 0, 0));
+    }
+
     public function test_the_markdown_report_lists_fixes_by_priority_with_their_pages(): void
     {
         $run = ['id' => 4, 'started_at' => '2026-10-31 10:00:00', 'pages_checked' => 12, 'score' => 71];
@@ -109,7 +122,7 @@ class ReportAndSettingsTest extends TestCase
         $markdown = ReportExport::markdown($run, $findings, 'https://example.com');
 
         $this->assertStringContainsString('# SEO audit: https://example.com', $markdown);
-        $this->assertStringContainsString('12 pages checked. Site score: 71/100.', $markdown);
+        $this->assertStringContainsString('12 pages checked. Site score: 71/100 (red).', $markdown);
         $this->assertStringContainsString('| Critical | 1 |', $markdown);
         $this->assertStringContainsString('- `/gone` - Status 404', $markdown);
         $this->assertStringContainsString('### Missing main heading (h1) (2)', $markdown);
