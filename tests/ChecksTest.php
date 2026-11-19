@@ -152,6 +152,22 @@ class ChecksTest extends TestCase
         $this->assertSame(['noindex_content'], $this->keysFor($findings, '/b/'));
     }
 
+    public function test_noindex_copy_of_an_indexable_page_is_not_raised(): void
+    {
+        $text = \implode(' ', \array_map(static fn (int $i): string => 'word' . ($i * 7 % 53) . 'x' . $i, \range(1, 400)));
+        $copy = $text . ' small extra change';
+        $pages = [
+            $this->page('/product/', ['body_simhash' => PageParser::simhash($text)]),
+            $this->page('/qr/product/', ['robots' => 'noindex,follow', 'in_sitemap' => 0, 'word_count' => 800, 'body_simhash' => PageParser::simhash($copy)]),
+            $this->page('/other/', ['robots' => 'noindex,follow', 'in_sitemap' => 0, 'word_count' => 800, 'body_simhash' => PageParser::simhash(\strrev($text) . ' unrelated words entirely')]),
+        ];
+
+        $findings = $this->audit($pages);
+
+        $this->assertSame([], $this->keysFor($findings, '/qr/product/'));
+        $this->assertSame(['noindex_content'], $this->keysFor($findings, '/other/'));
+    }
+
     public function test_noindex_pages_do_not_count_as_duplicates(): void
     {
         $pages = [

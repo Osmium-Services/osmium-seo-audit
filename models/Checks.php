@@ -48,7 +48,7 @@ class Checks
         'sitemap_missing' => ['label' => 'Sitemap missing or empty', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'The live site has no usable sitemap.xml, so search engines find pages only by following links.'],
         'soft_404' => ['label' => 'Missing pages do not return 404', 'severity' => 'high', 'group' => 'Site-wide', 'fix' => 'A made-up address did not return a 404 status. Search engines may index empty or duplicate pages. Return a real 404 for unknown pages.'],
         'lang_missing' => ['label' => 'No page language', 'severity' => 'low', 'group' => 'Technical', 'fix' => 'The html tag has no lang attribute (for example lang="en-GB"), which helps search engines and screen readers (theme).'],
-        'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content but tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
+        'noindex_content' => ['label' => 'Noindex page with real content', 'severity' => 'medium', 'group' => 'Indexing', 'fix' => 'This page has substantial content, is not a near-copy of an indexable page, and tells search engines not to index it. If that is not deliberate, change its robots setting (Pages > edit).'],
         'mixed_content' => ['label' => 'Mixed content (http on an https page)', 'severity' => 'high', 'group' => 'Technical', 'fix' => 'The page loads an image, script or style over http while the site is on https. Browsers block or warn about it. Change the address to https, or make it relative.'],
         'broken_image' => ['label' => 'Broken image', 'severity' => 'medium', 'group' => 'Content', 'fix' => 'An image on this page does not load, so visitors see a broken picture. Re-upload the file or remove the image.'],
     ];
@@ -57,7 +57,7 @@ class Checks
 
     public const DEFAULT_THRESHOLDS = [
         'titleMin' => 15, 'titleMax' => 60, 'descriptionMin' => 70, 'descriptionMax' => 160,
-        'thinWords' => 150, 'noindexWords' => 300, 'slowMs' => 1500, 'heavyBytes' => 1500000,
+        'thinWords' => 150, 'noindexWords' => 300, 'nearDuplicateBits' => 10, 'slowMs' => 1500, 'heavyBytes' => 1500000,
     ];
 
     /**
@@ -83,6 +83,8 @@ class Checks
             $byKey[$page['url']] = $page;
         }
 
+        $indexableHashes = self::indexableSimhashes($pages);
+
         $findings = [];
         foreach ($pages as $page) {
             $hasHtml = (int) ($page['status_code'] ?? 0) === 200;
@@ -90,7 +92,7 @@ class Checks
             $findings = \array_merge(
                 $findings,
                 self::indexingFindings($page, $context),
-                $isNoindex ? self::noindexFindings($page, $thresholds) : [],
+                $isNoindex ? self::noindexFindings($page, $thresholds, $indexableHashes) : [],
                 ($hasHtml && !$isNoindex) ? self::contentFindings($page, $thresholds) : [],
                 $hasHtml ? self::linkFindings($page, $byKey) : [],
                 $hasHtml ? self::imageFindings($page, $imageStatus) : [],
@@ -194,12 +196,38 @@ class Checks
     }
 
     /** A noindex page is not meant to rank, so the ranking checks are skipped: only one carrying real content is raised */
-    private static function noindexFindings(array $page, array $thresholds): array
+    private static function noindexFindings(array $page, array $thresholds, array $indexableHashes): array
     {
         $words = (int) ($page['word_count'] ?? 0);
         if ($words < $thresholds['noindexWords']) return [];
+        if (self::isNearDuplicate((string) ($page['body_simhash'] ?? ''), $indexableHashes, $thresholds['nearDuplicateBits'])) return [];
 
         return [self::finding('noindex_content', $page['url'], "{$words} words, but marked noindex")];
+    }
+
+    /** @return string[] simhashes of the indexable pages that returned HTML */
+    private static function indexableSimhashes(array $pages): array
+    {
+        $hashes = [];
+        foreach ($pages as $page) {
+            $indexable = (int) ($page['status_code'] ?? 0) === 200 && !PageParser::isNoindex((string) ($page['robots'] ?? ''));
+            $hash = (string) ($page['body_simhash'] ?? '');
+            if ($indexable && $hash !== '') $hashes[] = $hash;
+        }
+
+        return $hashes;
+    }
+
+    /** A noindex page that closely copies an indexable one is deliberate duplicate-content handling */
+    private static function isNearDuplicate(string $hash, array $indexableHashes, int $maxBits): bool
+    {
+        if ($hash === '') return false;
+
+        foreach ($indexableHashes as $other) {
+            if (PageParser::simhashDistance($hash, $other) <= $maxBits) return true;
+        }
+
+        return false;
     }
 
     private static function contentFindings(array $page, array $thresholds): array

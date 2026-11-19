@@ -45,6 +45,7 @@ class PageParser
             'has_viewport' => self::metaContent($xpath, 'name', 'viewport') !== '',
             'jsonld_invalid' => $jsonLdInvalid,
             'body_hash' => $text === '' ? null : \md5(\preg_replace('/\s+/', ' ', \strtolower($text)) ?? $text),
+            'body_simhash' => self::simhash($text),
             'links' => $links,
             'lang' => self::attribute($xpath, '//html', 'lang'),
             'icons' => self::icons($xpath),
@@ -114,6 +115,45 @@ class PageParser
         }
 
         return \trim((string) \preg_replace('/\s+/u', ' ', \implode(' ', $parts)));
+    }
+
+    /** 64-bit simhash of the word 3-grams as 16 hex characters: near-identical text gives hashes a few bits apart */
+    public static function simhash(string $text): ?string
+    {
+        $words = \preg_split('/\s+/u', \strtolower($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (\count($words) < 3) return null;
+
+        $votes = \array_fill(0, 64, 0);
+        for ($i = 0, $last = \count($words) - 3; $i <= $last; $i++) {
+            $digest = \md5($words[$i] . ' ' . $words[$i + 1] . ' ' . $words[$i + 2]);
+            $halves = [\hexdec(\substr($digest, 0, 8)), \hexdec(\substr($digest, 8, 8))];
+            for ($bit = 0; $bit < 64; $bit++) {
+                $set = ($halves[$bit >> 5] >> ($bit & 31)) & 1;
+                $votes[$bit] += $set ? 1 : -1;
+            }
+        }
+
+        $out = [0, 0];
+        for ($bit = 0; $bit < 64; $bit++) {
+            if ($votes[$bit] > 0) $out[$bit >> 5] |= 1 << ($bit & 31);
+        }
+
+        return \sprintf('%08x%08x', $out[0], $out[1]);
+    }
+
+    /** Number of differing bits between two simhashes from simhash() */
+    public static function simhashDistance(string $a, string $b): int
+    {
+        $bits = 0;
+        foreach ([0, 8] as $offset) {
+            $diff = \hexdec(\substr($a, $offset, 8)) ^ \hexdec(\substr($b, $offset, 8));
+            while ($diff) {
+                $bits += $diff & 1;
+                $diff >>= 1;
+            }
+        }
+
+        return $bits;
     }
 
     private static function wordCount(string $text): int

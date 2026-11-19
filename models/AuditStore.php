@@ -127,7 +127,7 @@ class AuditStore extends Model
             ':words' => (int) ($facts['word_count'] ?? 0), ':alt' => (int) ($facts['images_missing_alt'] ?? 0),
             ':ogTitle' => (int) ($facts['og_title'] ?? false), ':ogImage' => (int) ($facts['og_image'] ?? false),
             ':viewport' => (int) ($facts['has_viewport'] ?? false), ':jsonld' => (int) ($facts['jsonld_invalid'] ?? 0),
-            ':hash' => $facts['body_hash'] ?? null, ':ms' => $ms, ':bytes' => $bytes,
+            ':hash' => $facts['body_hash'] ?? null, ':simhash' => $facts['body_simhash'] ?? null, ':ms' => $ms, ':bytes' => $bytes,
             ':links' => \json_encode($facts['links'] ?? []), ':lang' => $facts['lang'] ?? null,
             ':icons' => isset($facts['icons']) ? \json_encode($facts['icons']) : null,
             ':images' => \json_encode($facts['images'] ?? []), ':insecure' => \json_encode($facts['insecure'] ?? []), ':id' => $id,
