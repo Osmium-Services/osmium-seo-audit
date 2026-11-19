@@ -47,10 +47,9 @@ $severityCards = [
     <p class="text-muted">Audit of <?= \htmlspecialchars($admin['startedLabel']) ?>: <?= (int) $run['pages_checked'] ?> pages checked.</p>
     <div class="row mb-4">
         <div class="col-6 col-lg-2 mb-3 mb-lg-0">
-            <div class="card h-100"><div class="card-body">
+            <div class="card h-100 seo-score-card<?= $admin['rating'] === null ? '' : ' seo-score-' . \strtolower($admin['rating']['label']) ?>"><div class="card-body">
                 <h2 class="mb-0"><?= $run['score'] === null ? '-' : (int) $run['score'] ?><small class="text-muted fs-6"> / 100</small></h2>
                 <small class="text-muted">Site score</small>
-                <?php if ($admin['rating'] !== null) : ?><span class="badge bg-label-<?= $admin['rating']['class'] ?> ms-2"><?= $admin['rating']['label'] ?></span><?php endif; ?>
             </div></div>
         </div>
         <?php foreach ($severityCards as $card) : ?>
@@ -66,6 +65,7 @@ $severityCards = [
     <?= ListView::render($admin['lists']['fixes'], $admin['fixes'], $listContext) ?>
 <?php endif ?>
 
+<link rel="stylesheet" href="/assets/services/osmium-seo-audit/seo-audit.css<?= $adminAssetVersion('/assets/services/osmium-seo-audit/seo-audit.css') ?>">
 <script nonce="<?= $cspNonce ?>">
 window.seoAuditConfig = {
     actionUrl: '<?= $adminUrl('seo-audit/action/') ?>',

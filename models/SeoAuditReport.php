@@ -95,7 +95,6 @@ class SeoAuditReport
             'statusLabel' => \ucfirst((string) $run['status']),
             'scoreLabel' => $score === null ? '-' : $score . ($scoreMove ? ' (' . ($scoreMove > 0 ? '+' : '') . $scoreMove . ')' : ''),
             'scoreSort' => $score ?? -1,
-            'rating' => self::ratingBadge($score, (int) ($run['critical_count'] ?? 0), (int) ($run['high_count'] ?? 0)),
             'changeLabel' => $diff === null ? 'First audit' : "{$diff['fixed']} fixed, {$diff['new']} new, {$diff['unchanged']} unchanged",
         ];
     }

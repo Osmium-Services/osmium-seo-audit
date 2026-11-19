@@ -1,0 +1,4 @@
+.seo-score-card.seo-score-red { background: #7f1d1d; color: #fecaca; }
+.seo-score-card.seo-score-amber { background: #78350f; color: #fde68a; }
+.seo-score-card.seo-score-green { background: #14532d; color: #bbf7d0; }
+.seo-score-card h2, .seo-score-card small { color: inherit !important; }
