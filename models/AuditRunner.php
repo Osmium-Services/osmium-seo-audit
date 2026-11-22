@@ -60,15 +60,39 @@ class AuditRunner
         return $runId;
     }
 
+    /** Largest number of child sitemaps followed from an index, so a bad index cannot keep a run busy */
+    private const MAX_CHILD_SITEMAPS = 50;
+
+    /**
+     * The root sitemap's status and every page address it lists. A sitemap index is followed one level down (own host
+     * only); the status stays the root's, and a child that cannot be fetched adds nothing.
+     *
+     * @return array{status: int, paths: string[]}
+     */
+    private function readSitemap(string $token): array
+    {
+        $root = $this->crawler->fetch($this->crawlBase() . '/sitemap.xml', $token);
+        $host = $this->siteHost();
+        $paths = SitemapReader::paths($root['body'], $host);
+
+        foreach (\array_slice(SitemapReader::children($root['body'], $host), 0, self::MAX_CHILD_SITEMAPS) as $child) {
+            $response = $this->crawler->fetch($this->crawlBase() . $child, $token);
+            if ($response['status'] !== 200) continue;
+            $paths = \array_merge($paths, SitemapReader::paths($response['body'], $host));
+        }
+
+        return ['status' => $root['status'], 'paths' => \array_values(\array_unique($paths))];
+    }
+
     /** Every address the live sitemap lists is checked too, in the exact form it is listed */
     private function queueSitemapPages(int $runId, string $token): void
     {
-        $response = $this->crawler->fetch($this->crawlBase() . '/sitemap.xml', $token);
-        $found = $response['status'] === 200;
+        $sitemap = $this->readSitemap($token);
+        $found = $sitemap['status'] === 200;
         if (!$found) return;
 
         $total = $this->store->progress($runId)['total'];
-        foreach (SitemapReader::paths($response['body'], $this->siteHost()) as $path) {
+        foreach ($sitemap['paths'] as $path) {
             $full = $total >= $this->settings['pageCap'];
             $tooLong = \strlen($path) > 255;
             if ($full) return;
@@ -225,12 +249,12 @@ class AuditRunner
 
         $robots = $this->crawler->fetch($this->crawlBase() . '/robots.txt', $token);
         $this->robotsTxt = $robots['status'] === 200 ? $robots['body'] : '';
-        $sitemap = $this->crawler->fetch($this->crawlBase() . '/sitemap.xml', $token);
+        $sitemap = $this->readSitemap($token);
         $probe = $this->unknownAddressStatus($token);
 
         return [
             'robots' => $robots['status'],
-            'sitemap' => ['status' => $sitemap['status'], 'urls' => \count(SitemapReader::paths($sitemap['body'], $this->siteHost()))],
+            'sitemap' => ['status' => $sitemap['status'], 'urls' => \count($sitemap['paths'])],
             'favicon' => $this->iconProbe($declared['icon'], '/favicon.ico', $token),
             'apple' => $this->iconProbe($declared['apple'], '/apple-touch-icon.png', $token),
             'notFound' => $probe,

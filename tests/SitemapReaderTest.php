@@ -26,4 +26,26 @@ class SitemapReaderTest extends TestCase
         $this->assertSame([], SitemapReader::paths('<html>not a sitemap', 'example.com'));
         $this->assertSame([], SitemapReader::paths('', 'example.com'));
     }
+
+    public function test_a_sitemap_index_has_children_but_no_pages(): void
+    {
+        $xml = '<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            . '<sitemap><loc>https://example.com/sitemap.xml?source=pages</loc></sitemap>'
+            . '<sitemap><loc>https://example.com/sitemap.xml?source=blog&amp;page=2</loc></sitemap>'
+            . '<sitemap><loc>https://other.com/sitemap.xml</loc></sitemap></sitemapindex>';
+
+        $this->assertSame([], SitemapReader::paths($xml, 'example.com'));
+        $this->assertSame(
+            ['/sitemap.xml?source=pages', '/sitemap.xml?source=blog&page=2'],
+            SitemapReader::children($xml, 'example.com'),
+        );
+    }
+
+    public function test_a_plain_sitemap_has_no_children(): void
+    {
+        $xml = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/a/</loc></url></urlset>';
+
+        $this->assertSame([], SitemapReader::children($xml, 'example.com'));
+        $this->assertSame([], SitemapReader::children('not xml', 'example.com'));
+    }
 }
