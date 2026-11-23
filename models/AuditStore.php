@@ -65,11 +65,12 @@ class AuditStore extends Model
         return $row ?: null;
     }
 
-    public function finishRun(int $id, string $status, int $pages, ?int $score): void
+    /** @param array<string, mixed>|null $coverage what the run could test (see Checks::coverage) */
+    public function finishRun(int $id, string $status, int $pages, ?int $score, ?array $coverage = null): void
     {
         $this->database->prepare(
             sql: $this->loadSqlFile('run-finish.sql'),
-            bindings: [':status' => $status, ':pages' => $pages, ':score' => $score, ':id' => $id],
+            bindings: [':status' => $status, ':pages' => $pages, ':score' => $score, ':coverage' => $coverage === null ? null : \json_encode($coverage), ':id' => $id],
         )->execute();
     }
 

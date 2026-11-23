@@ -36,7 +36,23 @@ class ReportExport
             $lines[] = '| ' . \ucfirst($severity) . ' | ' . $count . ' |';
         }
 
-        return \implode("\n", [...$lines, '', ...self::sections($findings)]) . "\n";
+        $summary = CheckSummary::rows($findings, CheckSummary::decode($run['coverage'] ?? null));
+
+        return \implode("\n", [...$lines, '', ...self::checkedTable($summary), '', ...self::sections($findings)]) . "\n";
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $summary from CheckSummary::rows()
+     * @return string[]
+     */
+    private static function checkedTable(array $summary): array
+    {
+        $lines = ['## What was checked', '', '| Check | Result | Detail |', '|---|---|---|'];
+        foreach ($summary as $row) {
+            $lines[] = '| ' . $row['label'] . ' | ' . $row['statusLabel'] . ' | ' . \str_replace('|', '/', (string) $row['detail']) . ' |';
+        }
+
+        return $lines;
     }
 
     /** @return string[] */

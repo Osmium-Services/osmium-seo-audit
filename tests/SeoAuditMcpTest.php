@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Services\SeoAudit;
 
+use Osmium\Services\SeoAudit\Models\Checks;
 use Osmium\Services\SeoAudit\Models\SeoAuditMcp;
 use PHPUnit\Framework\TestCase;
 
@@ -11,6 +12,7 @@ require_once __DIR__ . '/../models/Checks.php';
 require_once __DIR__ . '/../models/Scoring.php';
 require_once __DIR__ . '/../models/RunDiff.php';
 require_once __DIR__ . '/../models/SeoAuditReport.php';
+require_once __DIR__ . '/../models/CheckSummary.php';
 require_once __DIR__ . '/../models/SeoAuditMcp.php';
 
 /** The audit tool the /mcp endpoint offers: a score, counts and capped, masked fixes. Read only, no addresses. */
@@ -50,6 +52,31 @@ final class SeoAuditMcpTest extends TestCase
         $this->assertSame('critical', $result['fixes'][0]['priority']);
         $this->assertSame(2, $result['fixes'][1]['affected']);
         $this->assertNotSame('', $result['fixes'][0]['how_to_fix']);
+    }
+
+    public function test_every_check_is_listed_with_a_status_and_detail(): void
+    {
+        $coverage = \json_encode(['live' => false, 'https' => false, 'robots' => false, 'probed' => true, 'sitemapPages' => 40, 'pages' => 40, 'indexable' => 38, 'noindex' => 0, 'redirects' => 0, 'images' => 0, 'sitemapUrls' => 0, 'favicon' => 'declared', 'apple' => 'declared', 'thresholds' => []]);
+
+        $result = SeoAuditMcp::shape($this->run_() + ['coverage' => $coverage], [$this->finding('title_missing', 'high', '/a/')], null);
+
+        $this->assertSame(\array_keys(Checks::CATALOGUE), \array_column($result['checks'], 'check_key'));
+        $byKey = \array_column($result['checks'], null, 'check_key');
+        $this->assertSame(['check_key', 'label', 'status', 'detail'], \array_keys($byKey['page_error']));
+        $this->assertSame('pass', $byKey['page_error']['status']);
+        $this->assertSame('40 sitemap pages tested', $byKey['page_error']['detail']);
+        $this->assertSame('fail', $byKey['title_missing']['status']);
+        $this->assertSame('skipped', $byKey['robots_missing']['status']);
+        $this->assertSame('Skipped: runs on live only', $byKey['robots_missing']['detail']);
+        $this->assertArrayHasKey('fixes', $result);
+        $this->assertArrayHasKey('audit', $result);
+    }
+
+    public function test_a_run_without_coverage_reports_unknown_not_a_guess(): void
+    {
+        $byKey = \array_column(SeoAuditMcp::shape($this->run_(), [], null)['checks'], null, 'check_key');
+
+        $this->assertSame('unknown', $byKey['page_error']['status']);
     }
 
     public function test_pages_are_capped_per_fix_and_the_rest_counted(): void

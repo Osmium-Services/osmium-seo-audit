@@ -62,6 +62,8 @@ $severityCards = [
         <?php endforeach ?>
     </div>
 
+    <?= ListView::render($admin['lists']['checks'], $admin['checks'], $listContext) ?>
+
     <?= ListView::render($admin['lists']['fixes'], $admin['fixes'], $listContext) ?>
 <?php endif ?>
 

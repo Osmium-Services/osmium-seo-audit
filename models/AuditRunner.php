@@ -228,7 +228,7 @@ class AuditRunner
         $findings = Checks::run($pages, $context);
         $score = Scoring::score($findings, $pageCount);
         $this->store->addFindings($runId, $findings);
-        $this->store->finishRun(id: $runId, status: 'done', pages: $pageCount, score: $score);
+        $this->store->finishRun(id: $runId, status: 'done', pages: $pageCount, score: $score, coverage: Checks::coverage($pages, $context));
 
         return $score;
     }

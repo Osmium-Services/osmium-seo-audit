@@ -18,6 +18,7 @@ require_once __DIR__ . '/../models/Scoring.php';
 require_once __DIR__ . '/../models/PageParser.php';
 require_once __DIR__ . '/../models/RunDiff.php';
 require_once __DIR__ . '/../models/SeoAuditReport.php';
+require_once __DIR__ . '/../models/CheckSummary.php';
 require_once __DIR__ . '/../models/ReportExport.php';
 require_once __DIR__ . '/../models/AuditSettings.php';
 require_once __DIR__ . '/../models/Crawler.php';
@@ -127,6 +128,31 @@ class ReportAndSettingsTest extends TestCase
         $this->assertStringContainsString('- `/gone` - Status 404', $markdown);
         $this->assertStringContainsString('### Missing main heading (h1) (2)', $markdown);
         $this->assertLessThan(\strpos($markdown, '## High'), \strpos($markdown, '## Critical'));
+    }
+
+    public function test_the_markdown_has_a_what_was_checked_table_with_words_not_icons(): void
+    {
+        $coverage = \json_encode(['live' => false, 'https' => true, 'robots' => false, 'probed' => true, 'sitemapPages' => 12, 'pages' => 12, 'indexable' => 10, 'noindex' => 0, 'redirects' => 0, 'images' => 0, 'sitemapUrls' => 0, 'favicon' => 'declared', 'apple' => 'declared', 'thresholds' => ['titleMax' => 60]]);
+        $run = ['id' => 4, 'started_at' => '2026-10-31 10:00:00', 'pages_checked' => 12, 'score' => 90, 'coverage' => $coverage];
+        $findings = [['check_key' => 'h1_missing', 'severity' => 'high', 'page_url' => '/a', 'detail' => null]];
+
+        $markdown = ReportExport::markdown($run, $findings, 'https://example.com');
+
+        $this->assertStringContainsString("## What was checked\n\n| Check | Result | Detail |\n|---|---|---|", $markdown);
+        $this->assertStringContainsString('| Missing main heading (h1) | Fail | 1 page affected |', $markdown);
+        $this->assertStringContainsString('| Page returns an error | Pass | 12 sitemap pages tested |', $markdown);
+        $this->assertStringContainsString('| robots.txt missing | Skipped | Skipped: runs on live only |', $markdown);
+        $this->assertSame(1, \preg_match('/^[\x00-\x7F]*$/', $markdown), 'plain ASCII, no emoji');
+        $this->assertLessThan(\strpos($markdown, '## High'), \strpos($markdown, '## What was checked'));
+    }
+
+    public function test_the_markdown_for_a_run_without_coverage_says_unknown(): void
+    {
+        $run = ['id' => 4, 'started_at' => '2026-10-31 10:00:00', 'pages_checked' => 12, 'score' => 90];
+
+        $markdown = ReportExport::markdown($run, [], 'https://example.com');
+
+        $this->assertStringContainsString('| Page returns an error | Unknown | Coverage was not recorded for this run |', $markdown);
     }
 
     public function test_an_audit_with_no_findings_says_so(): void

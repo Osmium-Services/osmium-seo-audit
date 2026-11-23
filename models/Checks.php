@@ -115,6 +115,34 @@ class Checks
         return \array_values($findings);
     }
 
+    /**
+     * What a run was able to test, kept with the run so its report can say what passed, failed or could not run.
+     * Counts follow the same rules run() uses: a page "loaded" when it returned 200, "indexable" when it also is not noindex.
+     *
+     * @param array<int, array<string, mixed>> $pages every crawled page, as for run()
+     * @param array{thresholds?: array<string, int>, baseUrl?: string, isLive?: bool, site?: array<string, mixed>|null} $context
+     * @return array<string, mixed>
+     */
+    public static function coverage(array $pages, array $context = []): array
+    {
+        $counts = ['sitemapPages' => 0, 'pages' => 0, 'indexable' => 0, 'noindex' => 0, 'redirects' => 0, 'images' => 0];
+        foreach ($pages as $page) {
+            $counts = self::countPage($counts, $page);
+        }
+
+        $site = $context['site'] ?? null;
+        $live = (bool) ($context['isLive'] ?? false);
+        $thresholds = ($context['thresholds'] ?? []) + self::DEFAULT_THRESHOLDS;
+
+        return $counts + [
+            'live' => $live, 'https' => \str_starts_with((string) ($context['baseUrl'] ?? ''), 'https://'),
+            'robots' => $live && ($site['robots'] ?? null) === 200, 'probed' => $site !== null,
+            'sitemapUrls' => (int) ($site['sitemap']['urls'] ?? 0),
+            'favicon' => self::iconState($site['favicon'] ?? null), 'apple' => self::iconState($site['apple'] ?? null),
+            'thresholds' => $thresholds,
+        ];
+    }
+
     /** Comparison key for a path: lowercase, one leading slash, no trailing slash (the home page is '/') */
     public static function key(string $path): string
     {
@@ -146,6 +174,35 @@ class Checks
         }
 
         return $rules;
+    }
+
+    /** @param array<string, int> $counts */
+    private static function countPage(array $counts, array $page): array
+    {
+        if (($page['source'] ?? '') === 'image') {
+            $counts['images']++;
+
+            return $counts;
+        }
+
+        $status = (int) ($page['status_code'] ?? 0);
+        $isNoindex = $status === 200 && PageParser::isNoindex((string) ($page['robots'] ?? ''));
+        if (!empty($page['in_sitemap'])) $counts['sitemapPages']++;
+        if ($status >= 300 && $status < 400) $counts['redirects']++;
+        if ($status === 200) $counts['pages']++;
+        if ($isNoindex) $counts['noindex']++;
+        if ($status === 200 && !$isNoindex) $counts['indexable']++;
+
+        return $counts;
+    }
+
+    /** How a whole-site icon probe was made: the home page's declared icon, the conventional file, or not probed (hosted elsewhere) */
+    private static function iconState(?array $probe): ?string
+    {
+        if ($probe === null) return null;
+        if ($probe['status'] === null) return 'external';
+
+        return $probe['declared'] ? 'declared' : 'conventional';
     }
 
     private static function finding(string $key, ?string $url, ?string $detail = null): array

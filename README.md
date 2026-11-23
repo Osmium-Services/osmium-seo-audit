@@ -4,6 +4,17 @@ Audits the whole site on demand and lists the fixes from Critical down to Low, w
 
 Admin: Service Settings > SEO Audit (report, with Download report: the run as a Markdown file to hand to an assistant for suggested fixes), Runs (history and what changed), Settings (page limit, delay, crawl address, thresholds).
 
+## What was checked
+
+The report opens with a table of every check and its result, and the Markdown download and the `seo_audit_latest` MCP tool (`checks` list) carry the same rows.
+
+- **Fail**: the check found something. The detail says how many pages are affected.
+- **Pass**: the check ran and found nothing. The detail says what it covered, for example `48 pages tested, flagged when longer than 60 characters`.
+- **Skipped**: the check could not run, with the reason. Off live, `blocked_by_robots`, `robots_missing`, `sitemap_missing` and `no_https` are skipped (`Skipped: runs on live only`); `blocked_by_robots` is also skipped when robots.txt could not be read. `mixed_content` is skipped when the site address is not https. A check with nothing to test (no redirects, no images, no noindex pages) is skipped too. An icon hosted on another site is not probed.
+- **Unknown**: the run was saved before coverage was recorded, so only its failures are known.
+
+Coverage is recorded with each run (`runs.coverage`, migration 006) by `Checks::coverage()`, and turned into rows by `CheckSummary`.
+
 ## How it works
 
 - **Pages**: the home page and every live, non-redirected page from Pages, then any internal link found on the way, up to the page limit.
