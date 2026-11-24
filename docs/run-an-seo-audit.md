@@ -1,6 +1,7 @@
 ---
 title: Check your site for SEO problems
 tags: seo, audit, score, crawl, fixes, search engines
+page: admin/seo-audit, admin/seo-audit/runs, admin/seo-audit/settings
 ---
 
 **SEO Audit** checks every page of your site for search engine problems and lists what to fix first.
