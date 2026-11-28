@@ -1,7 +1,7 @@
 {
     "id": "osmium-seo-audit",
     "name": "Osmium SEO Audit",
-    "version": "0.7.2",
+    "version": "0.7.3",
     "description": "Audits the whole site on demand for SEO problems and lists the fixes in priority order, with a score you can track between runs",
     "category": "marketing-analytics",
     "author": {
@@ -70,6 +70,6 @@
         }
     },
     "setup": {
-        "postInstallNote": "Open Service Settings > SEO Audit and press Run audit. It fetches the site's own pages (from this server, marked so they never count in visitor stats or the redirect log), checks them and lists the fixes from Critical down to Low. Download report on a finished audit saves it as a Markdown file you can hand to an assistant to suggest fixes. Past runs and what changed since the last one are under Runs, and page limit, delay and the length thresholds are under Settings. It audits on demand only."
+        "postInstallNote": "Open Services > SEO Audit and press Run audit. It fetches the site's own pages (from this server, marked so they never count in visitor stats or the redirect log), checks them and lists the fixes from Critical down to Low. Download report on a finished audit saves it as a Markdown file you can hand to an assistant to suggest fixes. Past runs and what changed since the last one are under Runs, and page limit, delay and the length thresholds are under Settings. It audits on demand only."
     }
 }

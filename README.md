@@ -2,7 +2,7 @@
 
 Audits the whole site on demand and lists the fixes from Critical down to Low, with a 0-100 score to track between runs.
 
-Admin: Service Settings > SEO Audit (report, with Download report: the run as a Markdown file to hand to an assistant for suggested fixes), Runs (history and what changed), Settings (page limit, delay, crawl address, thresholds).
+Admin: Services > SEO Audit (report, with Download report: the run as a Markdown file to hand to an assistant for suggested fixes), Runs (history and what changed), Settings (page limit, delay, crawl address, thresholds).
 
 ## What was checked
 
